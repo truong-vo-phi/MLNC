@@ -1,0 +1,156 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+
+SURFACE = "#fcfcfb"
+TEXT_PRIMARY = "#0b0b0b"
+TEXT_SECONDARY = "#52514e"
+GRID = "#e4e3df"
+BLUE = "#2a78d6"
+ORANGE = "#eb6834"
+MASKING_LABELS = {False: "no masking", True: "FRCRN masking"}
+TEST_METRICS = ("top1_accuracy", "macro_f1", "mAP")
+
+
+def _style(ax: plt.Axes) -> None:
+    ax.set_facecolor(SURFACE)
+    ax.grid(axis="y", color=GRID, linewidth=0.8)
+    ax.set_axisbelow(True)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color(GRID)
+    ax.tick_params(colors=TEXT_SECONDARY, labelsize=9)
+    ax.title.set_color(TEXT_PRIMARY)
+    ax.xaxis.label.set_color(TEXT_SECONDARY)
+    ax.yaxis.label.set_color(TEXT_SECONDARY)
+
+
+def _figure(rows: int, cols: int, width: float, height: float) -> tuple[plt.Figure, Any]:
+    fig, axes = plt.subplots(rows, cols, figsize=(width, height), squeeze=False, facecolor=SURFACE)
+    return fig, axes
+
+
+def _save(fig: plt.Figure, path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=160, bbox_inches="tight", facecolor=SURFACE)
+    plt.close(fig)
+    return path
+
+
+def _series(history: Sequence[dict[str, float]], key: str) -> tuple[list[int], list[float]]:
+    return [record["epoch"] for record in history], [record[key] for record in history]
+
+
+def _line(ax: plt.Axes, history, key: str, color: str, label: str) -> None:
+    if not history or key not in history[0]:
+        return
+    epochs, values = _series(history, key)
+    ax.plot(
+        epochs,
+        values,
+        color=color,
+        linewidth=2,
+        marker="o",
+        markersize=5,
+        markeredgecolor=SURFACE,
+        markeredgewidth=1.5,
+        label=label,
+    )
+
+
+def _scenario_name(group: str, masking: bool) -> str:
+    return f"{group}_{'mask' if masking else 'nomask'}"
+
+
+def plot_map_curves(results: dict[str, dict[str, Any]], snr_groups: Sequence[str], path: Path) -> Path:
+    fig, axes = _figure(2, len(snr_groups), 3.6 * len(snr_groups), 6.4)
+    for row, masking in enumerate((False, True)):
+        for col, group in enumerate(snr_groups):
+            ax = axes[row][col]
+            _style(ax)
+            result = results.get(_scenario_name(group, masking))
+            if result is not None:
+                _line(ax, result["history"], "train_mAP", BLUE, "train")
+                _line(ax, result["history"], "val_mAP", ORANGE, "validation")
+            ax.set_title(f"{group} | {MASKING_LABELS[masking]}", fontsize=10, loc="left")
+            ax.set_ylim(0, 1.02)
+            if row == 1:
+                ax.set_xlabel("epoch")
+            if col == 0:
+                ax.set_ylabel("mAP")
+    handles, labels = axes[0][0].get_legend_handles_labels()
+    if handles:
+        fig.legend(handles, labels, loc="upper right", ncol=2, frameon=False, labelcolor=TEXT_SECONDARY)
+    fig.suptitle("mAP per epoch: train vs validation", x=0.01, ha="left", color=TEXT_PRIMARY, fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    return _save(fig, path)
+
+
+def plot_loss_curves(results: dict[str, dict[str, Any]], snr_groups: Sequence[str], path: Path) -> Path:
+    fig, axes = _figure(1, len(snr_groups), 3.6 * len(snr_groups), 3.4)
+    for col, group in enumerate(snr_groups):
+        ax = axes[0][col]
+        _style(ax)
+        for masking, color in ((False, BLUE), (True, ORANGE)):
+            result = results.get(_scenario_name(group, masking))
+            if result is not None:
+                _line(ax, result["history"], "train_loss", color, MASKING_LABELS[masking])
+        ax.set_title(group, fontsize=10, loc="left")
+        ax.set_xlabel("epoch")
+        if col == 0:
+            ax.set_ylabel("train loss")
+    handles, labels = axes[0][0].get_legend_handles_labels()
+    if handles:
+        fig.legend(handles, labels, loc="upper right", ncol=2, frameon=False, labelcolor=TEXT_SECONDARY)
+    fig.suptitle("BEATs training loss", x=0.01, ha="left", color=TEXT_PRIMARY, fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.9))
+    return _save(fig, path)
+
+
+def plot_test_metrics(results: dict[str, dict[str, Any]], snr_groups: Sequence[str], path: Path) -> Path:
+    fig, axes = _figure(1, len(TEST_METRICS), 4.2 * len(TEST_METRICS), 3.6)
+    width = 0.36
+    positions = range(len(snr_groups))
+    for col, metric in enumerate(TEST_METRICS):
+        ax = axes[0][col]
+        _style(ax)
+        for offset, masking, color in ((-width / 2, False, BLUE), (width / 2, True, ORANGE)):
+            values = [
+                results[name]["test"][metric] if (name := _scenario_name(group, masking)) in results else 0.0
+                for group in snr_groups
+            ]
+            bars = ax.bar(
+                [p + offset for p in positions], values, width * 0.92, color=color, label=MASKING_LABELS[masking]
+            )
+            ax.bar_label(bars, fmt="%.2f", fontsize=8, color=TEXT_SECONDARY, padding=2)
+        ax.set_xticks(list(positions), snr_groups)
+        ax.set_ylim(0, 1.05)
+        ax.set_title(f"test {metric}", fontsize=10, loc="left")
+    handles, labels = axes[0][0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper right", ncol=2, frameon=False, labelcolor=TEXT_SECONDARY)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    return _save(fig, path)
+
+
+def plot_frcrn_curve(result: dict[str, Any], path: Path) -> Path:
+    fig, axes = _figure(1, 1, 5.2, 3.6)
+    ax = axes[0][0]
+    _style(ax)
+    _line(ax, result["history"], "val_noise_si_snr", ORANGE, "fine-tuned (validation)")
+    ax.axhline(result["baseline_score"], color=BLUE, linewidth=2, label="pretrained baseline")
+    ax.set_title("FRCRN noise estimate SI-SNR", fontsize=10, loc="left")
+    ax.set_xlabel("epoch")
+    ax.set_ylabel("SI-SNR (dB)")
+    ax.legend(frameon=False, labelcolor=TEXT_SECONDARY, fontsize=9)
+    fig.tight_layout()
+    return _save(fig, path)
