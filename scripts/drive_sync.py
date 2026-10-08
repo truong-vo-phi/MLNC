@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import logging
+import sys
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
 DRIVE_FRCRN_DIR = "FA26_Capstone/Truong/FRCRN"
+DRIVE_FRCRN_VLSP_DIR = "FA26_Capstone/Truong/FRCRN_vlsp"
 BEST_FILENAME = "best.pt"
+
+
+def _put(fs: Any, local_path: str | Path, remote_dir: str, remote_path: str) -> None:
+    fs.makedirs(remote_dir, exist_ok=True)
+    fs.put_file(str(local_path), remote_path)
 
 
 class DriveCheckpointUploader:
@@ -23,8 +32,53 @@ class DriveCheckpointUploader:
     def __call__(self, local_path: str | Path, epoch: int, score: float) -> None:
         # Lỗi mạng/Drive không được làm hỏng quá trình train; checkpoint local vẫn còn.
         try:
-            self.fs.makedirs(self.remote_dir, exist_ok=True)
-            self.fs.put_file(str(local_path), self.remote_path)
+            _put(self.fs, local_path, self.remote_dir, self.remote_path)
             self.logger.info("drive: epoch %d (%.3f) -> %s", epoch, score, self.remote_path)
         except Exception as error:
             self.logger.warning("drive: upload failed at epoch %d: %r", epoch, error)
+
+
+class DriveLogUploader(logging.Handler):
+    """Handler gắn vào logger của lần chạy: định kỳ ghi đè file .log lên Google Drive trong lúc train."""
+
+    def __init__(self, fs: Any, log_file: str | Path, remote_dir: str, interval: float = 30.0) -> None:
+        super().__init__(level=logging.INFO)
+        self.fs = fs
+        self.log_file = Path(log_file)
+        self.remote_dir = remote_dir.strip("/")
+        self.interval = interval
+        self._last = float("-inf")
+        self._timer: threading.Timer | None = None
+
+    @property
+    def remote_path(self) -> str:
+        return f"{self.remote_dir}/{self.log_file.name}"
+
+    def emit(self, record: logging.LogRecord) -> None:
+        wait = self.interval - (time.monotonic() - self._last)
+        if wait <= 0:
+            self.upload()
+        elif self._timer is None:
+            self._timer = threading.Timer(wait, self._upload_pending)
+            self._timer.daemon = True
+            self._timer.start()
+
+    def _upload_pending(self) -> None:
+        self._timer = None
+        self.upload()
+
+    def close(self) -> None:
+        if self._timer is not None:
+            self._timer.cancel()
+            self._timer = None
+        super().close()
+
+    def upload(self) -> bool:
+        self._last = time.monotonic()
+        # Không dùng logger của lần chạy ở đây (đệ quy); lỗi Drive chỉ in ra stderr.
+        try:
+            _put(self.fs, self.log_file, self.remote_dir, self.remote_path)
+        except Exception as error:
+            print(f"drive: log upload failed: {error!r}", file=sys.stderr)
+            return False
+        return True

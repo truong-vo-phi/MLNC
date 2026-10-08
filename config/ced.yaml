@@ -1,0 +1,42 @@
+# Hyperparameters cho CED-Mini (arXiv:2308.11957, Table 1 + checkpoint mispeech/ced-mini).
+model:
+  patch_size: 16            # paper: patch 16x16 không chồng lấn
+  embed_dim: 256            # paper Table 1: Mini embed 256
+  depth: 12
+  num_heads: 4              # paper Table 1: Mini 4 heads
+  mlp_ratio: 4.0            # paper Table 1: Mini MLP 1024 = 4 x 256
+  qkv_bias: true
+  drop_rate: 0.0
+  attn_drop_rate: 0.0
+  target_length: 1012       # số khung của checkpoint pretrain (10 s, 63 time patch)
+  n_mels: 64                # paper: 64 mel bank
+  num_classes: 36
+
+frontend:
+  sample_rate: 16000        # paper: 16 kHz
+  n_fft: 512
+  win_size: 512             # paper: cửa sổ 32 ms
+  hop_size: 160             # paper: hop 10 ms
+  f_min: 0
+  f_max: 8000
+  center: true
+  top_db: 120.0
+
+train:
+  optimizer: adamw          # paper: Adam 8-bit; AdamW 32-bit để không phụ thuộc bitsandbytes
+  lr: 1.0e-3                # paper: lr tối đa 0.001 cho Tiny/Mini
+  weight_decay: 0.01        # TODO: paper không nêu weight decay
+  betas: [0.9, 0.999]
+  scheduler: cosine
+  warmup_ratio: 0.025       # paper AS-20K: warmup 5000 / (300 epoch x 661 batch) ~ 2.5%
+  min_lr_ratio: 0.1         # paper: decay về 10% lr tối đa
+  batch_size: 32            # paper AS-20K: batch 32
+  eval_batch_size: 64
+  epochs: 100               # TODO: paper dùng 300 epoch trên AS-20K; early stopping ở đây
+  patience: 15              # TODO: paper không dùng early stopping
+  seed: 42
+
+loss:
+  kd:
+    temperature: 4.0        # TODO: paper dùng BCE giữa logit student và teacher; ở đây KDLoss softmax (config/beat.yaml)
+    weight: 1.0

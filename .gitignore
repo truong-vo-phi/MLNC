@@ -24,3 +24,5 @@ output/checkpoint/
 *.part
 *.zip
 .env
+latex/
+doc/

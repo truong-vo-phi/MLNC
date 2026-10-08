@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +18,8 @@ BLUE = "#2a78d6"
 ORANGE = "#eb6834"
 MASKING_LABELS = {False: "no masking", True: "FRCRN masking"}
 TEST_METRICS = ("top1_accuracy", "macro_f1", "mAP")
+FRCRN_STAGES = (("pretrained", BLUE), ("finetuned", ORANGE))
+FRCRN_TEST_METRICS = ("noise_si_snr", "loss")
 
 
 def _style(ax: plt.Axes) -> None:
@@ -96,7 +98,9 @@ def plot_map_curves(results: dict[str, dict[str, Any]], snr_groups: Sequence[str
     return _save(fig, path)
 
 
-def plot_loss_curves(results: dict[str, dict[str, Any]], snr_groups: Sequence[str], path: Path) -> Path:
+def plot_loss_curves(
+    results: dict[str, dict[str, Any]], snr_groups: Sequence[str], path: Path, title: str = "BEATs training loss"
+) -> Path:
     fig, axes = _figure(1, len(snr_groups), 3.6 * len(snr_groups), 3.4)
     for col, group in enumerate(snr_groups):
         ax = axes[0][col]
@@ -112,34 +116,48 @@ def plot_loss_curves(results: dict[str, dict[str, Any]], snr_groups: Sequence[st
     handles, labels = axes[0][0].get_legend_handles_labels()
     if handles:
         fig.legend(handles, labels, loc="upper right", ncol=2, frameon=False, labelcolor=TEXT_SECONDARY)
-    fig.suptitle("BEATs training loss", x=0.01, ha="left", color=TEXT_PRIMARY, fontsize=12)
+    fig.suptitle(title, x=0.01, ha="left", color=TEXT_PRIMARY, fontsize=12)
     fig.tight_layout(rect=(0, 0, 1, 0.9))
     return _save(fig, path)
 
 
-def plot_test_metrics(results: dict[str, dict[str, Any]], snr_groups: Sequence[str], path: Path) -> Path:
-    fig, axes = _figure(1, len(TEST_METRICS), 4.2 * len(TEST_METRICS), 3.6)
+def _plot_grouped_test(
+    results: dict[str, dict[str, Any]],
+    snr_groups: Sequence[str],
+    path: Path,
+    metrics: Sequence[str],
+    series: Sequence[tuple[Callable[[str], str], str, str]],
+    column_width: float,
+    ylim: tuple[float, float] | None = None,
+) -> Path:
+    fig, axes = _figure(1, len(metrics), column_width * len(metrics), 3.6)
     width = 0.36
     positions = range(len(snr_groups))
-    for col, metric in enumerate(TEST_METRICS):
+    for col, metric in enumerate(metrics):
         ax = axes[0][col]
         _style(ax)
-        for offset, masking, color in ((-width / 2, False, BLUE), (width / 2, True, ORANGE)):
+        for offset, (scenario, color, label) in zip((-width / 2, width / 2), series, strict=True):
             values = [
-                results[name]["test"][metric] if (name := _scenario_name(group, masking)) in results else 0.0
-                for group in snr_groups
+                results[name]["test"][metric] if (name := scenario(group)) in results else 0.0 for group in snr_groups
             ]
-            bars = ax.bar(
-                [p + offset for p in positions], values, width * 0.92, color=color, label=MASKING_LABELS[masking]
-            )
+            bars = ax.bar([p + offset for p in positions], values, width * 0.92, color=color, label=label)
             ax.bar_label(bars, fmt="%.2f", fontsize=8, color=TEXT_SECONDARY, padding=2)
         ax.set_xticks(list(positions), snr_groups)
-        ax.set_ylim(0, 1.05)
+        if ylim is not None:
+            ax.set_ylim(*ylim)
         ax.set_title(f"test {metric}", fontsize=10, loc="left")
     handles, labels = axes[0][0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper right", ncol=2, frameon=False, labelcolor=TEXT_SECONDARY)
     fig.tight_layout(rect=(0, 0, 1, 0.92))
     return _save(fig, path)
+
+
+def plot_test_metrics(results: dict[str, dict[str, Any]], snr_groups: Sequence[str], path: Path) -> Path:
+    series = [
+        (lambda group, masking=masking: _scenario_name(group, masking), color, MASKING_LABELS[masking])
+        for masking, color in ((False, BLUE), (True, ORANGE))
+    ]
+    return _plot_grouped_test(results, snr_groups, path, TEST_METRICS, series, 4.2, ylim=(0, 1.05))
 
 
 def plot_frcrn_curve(result: dict[str, Any], path: Path) -> Path:
@@ -154,3 +172,8 @@ def plot_frcrn_curve(result: dict[str, Any], path: Path) -> Path:
     ax.legend(frameon=False, labelcolor=TEXT_SECONDARY, fontsize=9)
     fig.tight_layout()
     return _save(fig, path)
+
+
+def plot_frcrn_test(results: dict[str, dict[str, Any]], snr_groups: Sequence[str], path: Path) -> Path:
+    series = [(lambda group, stage=stage: f"{group}_{stage}", color, stage) for stage, color in FRCRN_STAGES]
+    return _plot_grouped_test(results, snr_groups, path, FRCRN_TEST_METRICS, series, 4.6)

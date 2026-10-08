@@ -10,7 +10,7 @@ import requests
 import yaml
 from tqdm import tqdm
 
-from scripts.load_dataset import AUDIOSET_KEY, MIXTURE_KEY, dataset_env_name, resolve_dataset_root
+from scripts.load_dataset import AUDIOSET_KEY, MIXTURE_KEY, VLSP_KEY, dataset_env_name, resolve_dataset_root
 
 ROOT = Path(__file__).resolve().parents[1]
 URL_CONFIG = ROOT / "config" / "url.yaml"
@@ -85,12 +85,13 @@ def download_kaggle_dataset(key: str, root: Path, name: str, url_config: Path = 
 class DatasetSpec:
     kaggle_key: str
     name: str
-    marker: str
+    marker: str = ""
 
 
 DATASETS: dict[str, DatasetSpec] = {
     AUDIOSET_KEY: DatasetSpec("kaggle-audioset", "audioset", "metadata/manifest.csv"),
     MIXTURE_KEY: DatasetSpec("kaggle-mix-dataset", "mix-dataset", "labels.txt"),
+    VLSP_KEY: DatasetSpec("kaggle-vlsp", "vlsp-100h"),
 }
 
 
@@ -115,6 +116,6 @@ def ensure_dataset(key: str, download_root: Path, url_config: Path = URL_CONFIG)
 
     spec = DATASETS[key]
     extract_dir = download_kaggle_dataset(spec.kaggle_key, download_root, spec.name, url_config)
-    root = find_root(extract_dir, spec.marker)
+    root = find_root(extract_dir, spec.marker) if spec.marker else extract_dir
     os.environ[dataset_env_name(key)] = str(root)
     return root

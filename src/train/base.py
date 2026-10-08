@@ -173,7 +173,7 @@ class Trainer(ABC):
                 stale = 0
             else:
                 stale += 1
-            tqdm.write(
+            self.logger.info(
                 f"[{self.name}] epoch {epoch}/{self.config.epochs}"
                 f" | train {self._format(train_stats)} | val {self._format(scores)}"
                 f" | best {self._best_score:.3f} @ {self._best_epoch} | stale {stale}/{self.config.patience}"

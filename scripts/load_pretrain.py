@@ -15,7 +15,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.core import BaseModel, LoadReport  # noqa: E402
-from src.model.beat import BEATClassifier  # noqa: E402
+from src.model.beat import BEATClassifier, BEATTeacher  # noqa: E402
+from src.model.ced import CEDClassifier  # noqa: E402
 from src.model.frcrn import FRCRNSeparator  # noqa: E402
 
 URL_CONFIG = ROOT / "config" / "url.yaml"
@@ -34,6 +35,8 @@ class PretrainedSpec:
 PRETRAINED: dict[str, PretrainedSpec] = {
     "beat": PretrainedSpec(BEATClassifier, "beat-pretrain", ROOT / "config" / "beat.yaml"),
     "frcrn": PretrainedSpec(FRCRNSeparator, "frcrn-pretrain", ROOT / "config" / "frcrn.yaml"),
+    "beat-teacher": PretrainedSpec(BEATTeacher, "beat-pretrain", ROOT / "config" / "beat.yaml"),
+    "ced": PretrainedSpec(CEDClassifier, "ced-mini-pretrain", ROOT / "config" / "ced.yaml"),
 }
 
 

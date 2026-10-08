@@ -9,19 +9,22 @@ AudioSet-40l và Mixture-36l.
 MLNC/
 ├── config/                 # hyperparameters và đường dẫn (yaml)
 │   ├── beat.yaml           # BEATs: kiến trúc, frontend, train, loss
+│   ├── ced.yaml            # CED-Mini: kiến trúc, frontend, train chưng cất
+│   ├── vlsp.yaml           # tỉ lệ chia train/validation/test cho VLSP-100h
 │   ├── frcrn.yaml          # FRCRN: model, loss, fine-tune
 │   ├── url.yaml            # URL checkpoint pretrain và đường dẫn dataset
 │   └── audioset_40_labels.csv  # 40 nhãn AudioSet, dùng khi dataset thiếu metadata/40_noise_labels.csv
 ├── src/
 │   ├── core/               # lớp cơ sở: BaseConfig, BaseModel, LoadReport
-│   ├── model/beat/         # BEATs base (patch embed, encoder, attention, head)
+│   ├── model/beat/         # BEATs base (patch embed, encoder, attention, head) và BEATTeacher (predictor 527 lớp)
+│   ├── model/ced/          # CED-Mini (mel frontend, patch embed, attention, encoder, backbone, head)
 │   ├── model/frcrn/        # FRCRN (UNet phức x2, STFT, separator)
 │   ├── loss/               # base + cross_entropy, kd, crd, frcrn
-│   ├── train/              # Trainer (template method) + BEATTrainer, FRCRNTrainer, config
+│   ├── train/              # Trainer (template method) + BEATTrainer, CEDTrainer (chưng cất), FRCRNTrainer, config
 │   ├── utils/              # logger, seed, checkpoint, paths, plots
 │   └── metrics.py          # ClassificationMetrics
-├── scripts/                # nạp dataset và checkpoint pretrain (hàm, gọi từ notebook)
-├── notebook/               # beat-v1.ipynb (FRCRN fine-tune + BEATs), beat-v2.ipynb (BEATs + masking từ pretrained/frcrn_best.pt)
+├── scripts/                # nạp dataset, checkpoint pretrain, upload best.pt lên Google Drive (hàm, gọi từ notebook)
+├── notebook/               # beat-v1.ipynb (FRCRN fine-tune + BEATs), beat-v2.ipynb (BEATs + masking từ pretrained/frcrn_best.pt), ced-v1.ipynb (chưng cất BEATs -> CED-Mini, chưa dùng masking), vlsp-v1.ipynb (fine-tune FRCRN trên giọng nói VLSP-100h trộn nhiễu AudioSet-40l; khi `RUN_TRAINING = True` trên GPU tự dò batch size lớn nhất trong `batch_candidates` của `config/frcrn.yaml`, và mỗi best mới được ghi đè thành `best.pt` tại `FA26_Capstone/Truong/FRCRN_vlsp` trên Google Drive)
 ├── tests/                  # pytest
 ├── doc/                    # tài liệu, tiêu chí đánh giá repo
 ├── skill/guide.MD          # quy định cấu trúc đầu ra và notebook
@@ -54,10 +57,11 @@ Nếu cần GPU, cài PyTorch bản CUDA trước theo hướng dẫn của PyTo
 |------|----------|
 | `audioset-40l` | `audio/` (wav) và `metadata/` (manifest, `40_noise_labels.csv`) |
 | `mixture-36l` | `train/`, `validation/`, `test/` (mỗi split có `manifest.csv`), `labels.txt` |
-| `beat-pretrain`, `frcrn-pretrain` | URL checkpoint pretrain |
+| `vlsp-100h` | chỉ cần file audio (wav/flac) ở bất kỳ thư mục con nào; split chia theo hash đường dẫn, tỉ lệ ở `config/vlsp.yaml` |
+| `beat-pretrain`, `frcrn-pretrain`, `ced-mini-pretrain` | URL checkpoint pretrain |
 | `kaggle-*` | slug dataset Kaggle, dùng khi dataset chưa có (token đọc từ biến môi trường `KAGGLE_ACCESS_TOKEN`) |
 
-Biến môi trường `MLNC_AUDIOSET_40L` và `MLNC_MIXTURE_36L` ghi đè đường dẫn trong `url.yaml`. Cell nạp dataset gọi `ensure_dataset`:
+Biến môi trường `MLNC_AUDIOSET_40L`, `MLNC_MIXTURE_36L` và `MLNC_VLSP_100H` ghi đè đường dẫn trong `url.yaml`. Cell nạp dataset gọi `ensure_dataset`:
 nếu đường dẫn trong `url.yaml` không tồn tại thì dùng hoặc tải dataset vào `datasets/` rồi tự đặt biến môi trường.
 
 ## Chạy

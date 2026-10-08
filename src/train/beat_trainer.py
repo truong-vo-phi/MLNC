@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -12,23 +13,23 @@ from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
+from src.core import BaseModel
 from src.loss import CrossEntropyLoss
 from src.metrics import ClassificationMetrics
-from src.model.beat import BEATClassifier
 from src.model.frcrn import FRCRNSeparator
 
 from .base import StepOutput, Trainer
 from .config import BEATTrainConfig
 
 
-def cosine_with_warmup(optimizer: AdamW, total_steps: int, warmup_ratio: float) -> LambdaLR:
+def cosine_with_warmup(optimizer: AdamW, total_steps: int, warmup_ratio: float, min_lr_ratio: float = 0.0) -> LambdaLR:
     warmup_steps = max(int(total_steps * warmup_ratio), 1)
 
     def schedule(step: int) -> float:
         if step < warmup_steps:
             return (step + 1) / warmup_steps
         progress = (step - warmup_steps) / max(total_steps - warmup_steps, 1)
-        return 0.5 * (1.0 + math.cos(math.pi * progress))
+        return min_lr_ratio + (1.0 - min_lr_ratio) * 0.5 * (1.0 + math.cos(math.pi * progress))
 
     return LambdaLR(optimizer, schedule)
 
@@ -38,7 +39,7 @@ class BEATTrainer(Trainer):
 
     def __init__(
         self,
-        model: BEATClassifier,
+        model: BaseModel,
         config: BEATTrainConfig,
         device: torch.device,
         logger: logging.Logger,
@@ -67,7 +68,9 @@ class BEATTrainer(Trainer):
             betas=tuple(self.config.betas),
         )
         total_steps = self.config.epochs * steps_per_epoch
-        self.scheduler = cosine_with_warmup(self.optimizer, total_steps, self.config.warmup_ratio)
+        self.scheduler = cosine_with_warmup(
+            self.optimizer, total_steps, self.config.warmup_ratio, self.config.min_lr_ratio
+        )
 
     def prepare(self, batch: dict[str, Any]) -> tuple[Tensor, Tensor]:
         waveform = batch["waveform"].to(self.device)
@@ -95,11 +98,16 @@ class BEATTrainer(Trainer):
     def epoch_summary(self) -> dict[str, float]:
         return {"acc": self._correct / max(self._seen, 1), "mAP": self._train_metrics.compute().mAP}
 
-    @torch.no_grad()
     def evaluate(self, loader: DataLoader, desc: str = "evaluate") -> dict[str, float]:
         self.model.eval()
+        return self._evaluate_with(self.model.predict_proba, loader, desc)
+
+    @torch.no_grad()
+    def _evaluate_with(
+        self, predict_proba: Callable[[Tensor], Tensor], loader: DataLoader, desc: str
+    ) -> dict[str, float]:
         metrics = ClassificationMetrics(num_classes=self.num_classes)
         for batch in tqdm(loader, desc=desc, unit="batch", leave=False, dynamic_ncols=True):
             waveform, labels = self.prepare(batch)
-            metrics.update(labels, self.model.predict_proba(waveform))
+            metrics.update(labels, predict_proba(waveform))
         return metrics.compute().to_dict()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -13,6 +14,7 @@ from tqdm.auto import tqdm
 
 from src.loss.frcrn import si_snr
 from src.model.frcrn import FRCRNSeparator
+from src.utils.batch_size import largest_fitting_batch
 
 from .base import StepOutput, Trainer
 from .config import FRCRNTrainConfig
@@ -73,3 +75,33 @@ class FRCRNTrainer(Trainer):
         for group in self.optimizer.param_groups:
             group["lr"] *= 0.5
         self.logger.info("%s reload best epoch %d, lr -> %.1e", self.name, self._best_epoch, self.lr)
+
+
+def scale_batch_size(
+    config: FRCRNTrainConfig,
+    model_yaml: str | Path,
+    device: torch.device,
+    sample_rate: int,
+    logger: logging.Logger,
+) -> FRCRNTrainConfig:
+    probe = FRCRNSeparator.from_yaml(model_yaml).to(device).train()
+    samples = int(config.segment_seconds * sample_rate)
+
+    def step(size: int) -> None:
+        mixture = torch.randn(size, samples, device=device) * 0.1
+        noise = torch.randn(size, samples, device=device) * 0.05
+        probe.loss(mixture, noise).backward()
+        probe.zero_grad(set_to_none=True)
+
+    fitted = largest_fitting_batch(step, config.batch_candidates, device, config.vram_fraction)
+    if fitted is None:
+        logger.info("batch size: keep %d (no probe or no candidate fits)", config.batch_size)
+        return config
+    logger.info(
+        "batch size: %d -> %d (largest of %s within %.0f%% VRAM)",
+        config.batch_size,
+        fitted,
+        list(config.batch_candidates),
+        config.vram_fraction * 100,
+    )
+    return replace(config, batch_size=fitted)

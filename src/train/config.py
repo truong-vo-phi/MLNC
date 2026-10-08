@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from src.core import BaseConfig
 
@@ -16,14 +16,6 @@ class TrainConfig(BaseConfig):
     batch_size: int = 32
     eval_batch_size: int = 64
 
-    @classmethod
-    def from_dict(cls, values: dict[str, Any]) -> TrainConfig:
-        normalized = dict(values)
-        for name in ("betas", "snr_levels"):
-            if name in normalized:
-                normalized[name] = tuple(normalized[name])
-        return super().from_dict(normalized)
-
 
 @dataclass(frozen=True)
 class FRCRNTrainConfig(TrainConfig):
@@ -36,6 +28,8 @@ class FRCRNTrainConfig(TrainConfig):
     segment_seconds: float = 2.0
     eval_segment_seconds: float = 4.0
     snr_levels: tuple[float, ...] = (-5, 0, 5, 10, 15, 20)
+    batch_candidates: tuple[int, ...] = ()
+    vram_fraction: float = 0.9
 
 
 @dataclass(frozen=True)
@@ -43,4 +37,14 @@ class BEATTrainConfig(TrainConfig):
     weight_decay: float = 0.01
     betas: tuple[float, float] = (0.9, 0.98)
     warmup_ratio: float = 0.1
+    min_lr_ratio: float = 0.0
     label_smoothing: float = 0.0
+
+
+@dataclass(frozen=True)
+class CEDTrainConfig(BEATTrainConfig):
+    lr: float = 1e-3
+    betas: tuple[float, float] = (0.9, 0.999)
+    warmup_ratio: float = 0.025
+    min_lr_ratio: float = 0.1
+    kd_temperature: float = 4.0

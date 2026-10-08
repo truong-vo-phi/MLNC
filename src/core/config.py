@@ -16,7 +16,9 @@ class BaseConfig:
     @classmethod
     def from_dict(cls: type[ConfigT], values: dict[str, Any]) -> ConfigT:
         names = {field.name for field in fields(cls)}
-        return cls(**{key: value for key, value in values.items() if key in names})
+        return cls(
+            **{key: tuple(value) if isinstance(value, list) else value for key, value in values.items() if key in names}
+        )
 
     @classmethod
     def from_yaml(cls: type[ConfigT], path: str | Path) -> ConfigT:

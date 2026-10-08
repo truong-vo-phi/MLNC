@@ -4,8 +4,10 @@ import csv
 import json
 import logging
 import os
+import zlib
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from functools import cache
 from math import gcd
 from pathlib import Path
 from typing import Any, TypedDict
@@ -23,6 +25,9 @@ URL_CONFIG = ROOT / "config" / "url.yaml"
 LABELS_FALLBACK = ROOT / "config" / "audioset_40_labels.csv"
 AUDIOSET_KEY = "audioset-40l"
 MIXTURE_KEY = "mixture-36l"
+VLSP_KEY = "vlsp-100h"
+VLSP_CONFIG = ROOT / "config" / "vlsp.yaml"
+AUDIO_EXTENSIONS = (".wav", ".flac")
 SAMPLE_RATE = 16000
 ALL_SNR = (-5, 0, 5, 10, 15, 20)
 
@@ -60,6 +65,14 @@ def read_csv(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(f))
 
 
+def read_class_mids(class_names: Sequence[str], labels_file: Path = LABELS_FALLBACK) -> list[str]:
+    mids = {row["name"]: row["mid"] for row in read_csv(labels_file)}
+    missing = [name for name in class_names if name not in mids]
+    if missing:
+        raise KeyError(f"classes not in {labels_file}: {missing}")
+    return [mids[name] for name in class_names]
+
+
 def fit_length(waveform: np.ndarray, num_samples: int) -> np.ndarray:
     if len(waveform) >= num_samples:
         return waveform[:num_samples]
@@ -72,6 +85,18 @@ def load_waveform(
     num_samples: int | None = None,
     rng: np.random.Generator | None = None,
 ) -> Tensor:
+    waveform = read_audio(path, sample_rate, num_samples, rng)
+    if num_samples is not None:
+        waveform = fit_length(waveform, num_samples)
+    return torch.from_numpy(np.ascontiguousarray(waveform, dtype=np.float32))
+
+
+def read_audio(
+    path: Path,
+    sample_rate: int,
+    num_samples: int | None = None,
+    rng: np.random.Generator | None = None,
+) -> np.ndarray:
     info = sf.info(path)
     start, frames = 0, -1
     if num_samples is not None:
@@ -83,13 +108,13 @@ def load_waveform(
     if source_rate != sample_rate:
         divisor = gcd(source_rate, sample_rate)
         waveform = resample_poly(waveform, sample_rate // divisor, source_rate // divisor)
-    if num_samples is not None:
-        waveform = fit_length(waveform, num_samples)
-    return torch.from_numpy(np.ascontiguousarray(waveform, dtype=np.float32))
+    return waveform
 
 
-def mix_at_snr(speech: np.ndarray, noise: np.ndarray, snr_db: float) -> tuple[np.ndarray, np.ndarray]:
-    speech_power = float(np.mean(speech**2)) + 1e-8
+def mix_at_snr(
+    speech: np.ndarray, noise: np.ndarray, snr_db: float, speech_length: int | None = None
+) -> tuple[np.ndarray, np.ndarray]:
+    speech_power = float(np.mean(speech[:speech_length] ** 2)) + 1e-8
     noise_power = float(np.mean(noise**2)) + 1e-8
     noise = noise * np.sqrt(speech_power / (noise_power * 10 ** (snr_db / 10)))
     mixture = speech + noise
@@ -237,12 +262,15 @@ class DynamicMixDataset(AudioDataset):
         seed: int = 0,
     ) -> None:
         super().__init__(root, split, sample_rate, duration)
-        rows = read_csv(self.root / split / "manifest.csv")
-        self.speech_paths = sorted({self.root / row["clean_path"] for row in rows})
+        self.speech_paths = self.list_speech(split)
         self.noise_dataset = noise_dataset or AudioSet40Dataset(split=split, sample_rate=sample_rate, duration=None)
         self.snr_levels = tuple(snr_levels)
         self.deterministic = deterministic
         self.seed = seed
+
+    def list_speech(self, split: str) -> list[Path]:
+        rows = read_csv(self.root / split / "manifest.csv")
+        return sorted({self.root / row["clean_path"] for row in rows})
 
     def __len__(self) -> int:
         return len(self.speech_paths)
@@ -253,10 +281,12 @@ class DynamicMixDataset(AudioDataset):
     def __getitem__(self, index: int) -> AudioItem:
         rng = self._rng(index)
         noise_path, _ = self.noise_dataset.samples[int(rng.integers(0, len(self.noise_dataset)))]
-        speech = self.read(self.speech_paths[index], rng).numpy()
+        speech = read_audio(self.speech_paths[index], self.sample_rate, self.num_samples, rng)
+        speech_length = len(speech)
+        speech = fit_length(speech, self.num_samples)
         noise = self.read(noise_path, rng).numpy()
         snr_db = float(rng.choice(self.snr_levels))
-        mixture, noise = mix_at_snr(speech, noise, snr_db)
+        mixture, noise = mix_at_snr(speech, noise, snr_db, speech_length)
         return {
             "waveform": torch.from_numpy(mixture),
             "noise": torch.from_numpy(noise),
@@ -264,8 +294,78 @@ class DynamicMixDataset(AudioDataset):
         }
 
 
+def read_split_ratios(path: Path = VLSP_CONFIG) -> dict[str, float]:
+    with open(path, encoding="utf-8") as f:
+        ratios = {name: float(value) for name, value in yaml.safe_load(f)["split"].items()}
+    if abs(sum(ratios.values()) - 1.0) > 1e-6:
+        raise ValueError(f"split ratios in {path} must sum to 1, got {sum(ratios.values())}")
+    return ratios
+
+
+def split_of(relative_path: str, ratios: Mapping[str, float]) -> str:
+    position = zlib.crc32(relative_path.encode("utf-8")) / 2**32
+    upper = 0.0
+    for split, ratio in ratios.items():
+        upper += ratio
+        if position < upper:
+            return split
+    return next(reversed(ratios))
+
+
+@cache
+def list_audio_files(root: Path) -> tuple[Path, ...]:
+    files = tuple(sorted(path for path in root.rglob("*") if path.suffix.lower() in AUDIO_EXTENSIONS))
+    if not files:
+        raise FileNotFoundError(f"No {AUDIO_EXTENSIONS} files under {root}")
+    return files
+
+
+def vlsp_files(root: Path, split: str, split_ratios: Mapping[str, float] | None = None) -> list[Path]:
+    ratios = dict(split_ratios) if split_ratios else read_split_ratios()
+    if split not in ratios:
+        raise ValueError(f"Unknown split '{split}', expected one of {sorted(ratios)}")
+    return [path for path in list_audio_files(root) if split_of(path.relative_to(root).as_posix(), ratios) == split]
+
+
+class VLSPDataset(AudioDataset):
+    dataset_key = VLSP_KEY
+
+    def __init__(
+        self,
+        root: str | Path | None = None,
+        split: str = "train",
+        sample_rate: int = SAMPLE_RATE,
+        duration: float | None = None,
+        split_ratios: Mapping[str, float] | None = None,
+    ) -> None:
+        super().__init__(root, split, sample_rate, duration)
+        self.paths = vlsp_files(self.root, split, split_ratios)
+
+    def __len__(self) -> int:
+        return len(self.paths)
+
+    def __getitem__(self, index: int) -> AudioItem:
+        path = self.paths[index]
+        return {"waveform": self.read(path), "sample_id": path.relative_to(self.root).as_posix()}
+
+
+class VLSPMixDataset(DynamicMixDataset):
+    dataset_key = VLSP_KEY
+
+    def __init__(self, *args: Any, split_ratios: Mapping[str, float] | None = None, **kwargs: Any) -> None:
+        self.split_ratios = split_ratios
+        super().__init__(*args, **kwargs)
+
+    def list_speech(self, split: str) -> list[Path]:
+        return vlsp_files(self.root, split, self.split_ratios)
+
+
 def build_dataset(name: str, split: str, **kwargs: Any) -> AudioDataset:
-    builders: dict[str, type[AudioDataset]] = {AUDIOSET_KEY: AudioSet40Dataset, MIXTURE_KEY: Mixture36Dataset}
+    builders: dict[str, type[AudioDataset]] = {
+        AUDIOSET_KEY: AudioSet40Dataset,
+        MIXTURE_KEY: Mixture36Dataset,
+        VLSP_KEY: VLSPDataset,
+    }
     if name not in builders:
         raise ValueError(f"Unknown dataset '{name}', expected one of {sorted(builders)}")
     return builders[name](split=split, **kwargs)
@@ -287,7 +387,8 @@ def summarize(name: str, splits: tuple[str, ...]) -> None:
     for split in splits:
         dataset = build_dataset(name, split)
         shapes = {k: tuple(v.shape) for k, v in dataset[0].items() if isinstance(v, Tensor)}
-        logger.info("%s/%s: %d samples, %d classes, %s", name, split, len(dataset), dataset.num_classes, shapes)
+        classes = dataset.num_classes if isinstance(dataset, LabeledAudioDataset) else 0
+        logger.info("%s/%s: %d samples, %d classes, %s", name, split, len(dataset), classes, shapes)
 
 
 def read_noise_ytids(root: str | Path | None = None, splits: Sequence[str] = ("validation", "test")) -> set[str]:

@@ -31,8 +31,11 @@ class BaseModel(nn.Module, ABC):
     @abstractmethod
     def convert_checkpoint(self, checkpoint: dict[str, Any]) -> dict[str, Tensor]: ...
 
+    def read_checkpoint(self, path: str | Path) -> dict[str, Any]:
+        return torch.load(path, map_location="cpu", weights_only=self.weights_only)
+
     def load_pretrained(self, path: str | Path) -> LoadReport:
-        checkpoint = torch.load(path, map_location="cpu", weights_only=self.weights_only)
+        checkpoint = self.read_checkpoint(path)
         result = self.load_state_dict(self.convert_checkpoint(checkpoint), strict=False)
         missing = tuple(key for key in result.missing_keys if not key.startswith(self.expected_missing_prefixes))
         report = LoadReport(missing=missing, unexpected=tuple(result.unexpected_keys))

@@ -76,3 +76,11 @@ def test_fit_early_stops(tmp_path):
     assert result.epochs_run == 3
     assert result.best_epoch == 1
     assert result.to_dict()["selection_metric"] == "score"
+
+
+def test_on_checkpoint_fires_on_each_new_best(tmp_path):
+    calls = []
+    trainer = make_trainer(tmp_path, [0.1, 0.5, 0.3, 0.6], epochs=4, patience=5)
+    trainer.on_checkpoint = lambda path, epoch, score: calls.append((path.name, epoch, score))
+    trainer.fit(make_loader(), make_loader())
+    assert calls == [("best.pt", 1, 0.1), ("best.pt", 2, 0.5), ("best.pt", 4, 0.6)]
