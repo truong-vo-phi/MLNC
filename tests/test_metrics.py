@@ -11,7 +11,7 @@ from sklearn.metrics import (
     top_k_accuracy_score,
 )
 
-from src.metrics import ClassificationMetrics
+from src.metrics import ClassificationMetrics, confusion_matrix, top_confusions
 
 
 @pytest.fixture(scope="module")
@@ -75,3 +75,28 @@ def test_invalid_arguments():
         ClassificationMetrics(num_classes=1)
     with pytest.raises(ValueError):
         ClassificationMetrics(top_k=0)
+
+
+def test_confusion_matrix_counts_and_top_confusions():
+    y_true = [0, 0, 0, 1, 2, 2]
+    y_pred = [0, 1, 1, 1, 0, 2]
+    matrix = confusion_matrix(y_true, y_pred, 3)
+    assert matrix.tolist() == [[1, 2, 0], [0, 1, 0], [1, 0, 1]]
+    pairs = top_confusions(matrix, ["a", "b", "c"], top_n=5)
+    assert [(p.true_label, p.predicted_label, p.count) for p in pairs] == [("a", "b", 2), ("c", "a", 1)]
+    assert pairs[0].rate == pytest.approx(2 / 3)
+    with pytest.raises(ValueError):
+        confusion_matrix([0, 3], [0, 1], 3)
+    with pytest.raises(ValueError):
+        top_confusions(matrix, ["a", "b"])
+
+
+def test_metrics_accumulator_confusion_matrix_matches_argmax(multiclass):
+    _, c, y_true, y_score = multiclass
+    metrics = ClassificationMetrics(num_classes=c)
+    metrics.update(y_true[:2500], y_score[:2500]).update(y_true[2500:], y_score[2500:])
+    matrix = metrics.confusion_matrix()
+    assert matrix.sum() == len(y_true)
+    assert np.trace(matrix) == int((y_score.argmax(axis=1) == y_true).sum())
+    with pytest.raises(ValueError):
+        ClassificationMetrics(num_classes=c).confusion_matrix()

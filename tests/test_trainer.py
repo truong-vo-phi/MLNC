@@ -6,7 +6,7 @@ from torch.optim import SGD
 from torch.utils.data import DataLoader
 
 from src.core import BaseModel
-from src.train import StepOutput, TrainConfig, Trainer
+from src.train import BEATTrainConfig, BEATTrainer, StepOutput, TrainConfig, Trainer
 
 
 class Regressor(BaseModel):
@@ -84,3 +84,27 @@ def test_on_checkpoint_fires_on_each_new_best(tmp_path):
     trainer.on_checkpoint = lambda path, epoch, score: calls.append((path.name, epoch, score))
     trainer.fit(make_loader(), make_loader())
     assert calls == [("best.pt", 1, 0.1), ("best.pt", 2, 0.5), ("best.pt", 4, 0.6)]
+
+
+class StubClassifier(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.config = type("Config", (), {"num_classes": 3})()
+        self.linear = nn.Linear(4, 3)
+
+    def predict_proba(self, waveform):
+        return self.linear(waveform).softmax(dim=-1)
+
+
+def test_beat_trainer_confusion_matrix_counts_every_sample(tmp_path):
+    torch.manual_seed(0)
+    waveforms = torch.randn(10, 4)
+    targets = nn.functional.one_hot(torch.arange(10) % 3, 3).float()
+    batches = [{"waveform": waveforms[i : i + 5], "target": targets[i : i + 5]} for i in (0, 5)]
+    trainer = BEATTrainer(
+        StubClassifier(), BEATTrainConfig(), torch.device("cpu"), logging.getLogger("test"), "stub", tmp_path / "b.pt"
+    )
+    matrix = trainer.confusion_matrix(batches)
+    assert matrix.shape == (3, 3)
+    assert matrix.sum() == 10
+    assert matrix.sum(axis=1).tolist() == [4, 3, 3]

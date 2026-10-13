@@ -38,6 +38,27 @@ class DriveCheckpointUploader:
             self.logger.warning("drive: upload failed at epoch %d: %r", epoch, error)
 
 
+class DriveFileBackup:
+    """Ghi đè một file local (resume, history...) lên Drive mỗi lần gọi; lỗi mạng không làm gãy train."""
+
+    def __init__(self, fs: Any, remote_dir: str, filename: str, logger: logging.Logger | None = None) -> None:
+        self.fs = fs
+        self.remote_dir = remote_dir.strip("/")
+        self.filename = filename.strip("/")
+        self.logger = logger or logging.getLogger(__name__)
+
+    @property
+    def remote_path(self) -> str:
+        return f"{self.remote_dir}/{self.filename}"
+
+    def __call__(self, local_path: str | Path) -> None:
+        try:
+            _put(self.fs, local_path, self.remote_dir, self.remote_path)
+            self.logger.info("drive backup: %s -> %s", local_path, self.remote_path)
+        except Exception as error:
+            self.logger.warning("drive backup failed for %s: %r", local_path, error)
+
+
 class DriveLogUploader(logging.Handler):
     """Handler gắn vào logger của lần chạy: định kỳ ghi đè file .log lên Google Drive trong lúc train."""
 

@@ -1,0 +1,8 @@
+/* Nạp font từ Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap');
+
+:root {
+  --marimo-monospace-font: 'JetBrains Mono', monospace;
+  --marimo-text-font: 'Inter', sans-serif;
+  --marimo-heading-font: 'Inter', sans-serif;
+}

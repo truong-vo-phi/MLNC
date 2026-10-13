@@ -10,6 +10,8 @@ MLNC/
 ├── config/                 # hyperparameters và đường dẫn (yaml)
 │   ├── beat.yaml           # BEATs: kiến trúc, frontend, train, loss
 │   ├── ced.yaml            # CED-Mini: kiến trúc, frontend, train chưng cất
+│   ├── kdmoe_s.yaml        # KD-MoE cấu hình S (d 128, ~1.25M tham số), kèm M/L
+│   ├── group_map.json      # ánh xạ mid -> label_index -> nhóm expert E0-E3 (kèm membership.npy)
 │   ├── vlsp.yaml           # tỉ lệ chia train/validation/test cho VLSP-100h
 │   ├── frcrn.yaml          # FRCRN: model, loss, fine-tune
 │   ├── url.yaml            # URL checkpoint pretrain và đường dẫn dataset
@@ -19,11 +21,12 @@ MLNC/
 │   ├── model/beat/         # BEATs base (patch embed, encoder, attention, head) và BEATTeacher (predictor 527 lớp)
 │   ├── model/ced/          # CED-Mini (mel frontend, patch embed, attention, encoder, backbone, head)
 │   ├── model/frcrn/        # FRCRN (UNet phức x2, STFT, separator)
-│   ├── loss/               # base + cross_entropy, kd, crd, frcrn
-│   ├── train/              # Trainer (template method) + BEATTrainer, CEDTrainer (chưng cất), FRCRNTrainer, config
-│   ├── utils/              # logger, seed, checkpoint, paths, plots
+│   ├── model/kdmoe/        # KD-MoE student lai cascade (log-mel, khối lai, cổng, ViT, BiGRU, router, 4 expert)
+│   ├── loss/               # base + cross_entropy, kd, crd, frcrn, kdmoe (RouterKD, Front, Consistency)
+│   ├── train/              # Trainer (template method) + BEATTrainer, CEDTrainer (chưng cất), FRCRNTrainer, KDMoETrainer (2 giai đoạn), config
+│   ├── utils/              # logger, seed, checkpoint, paths, plots, EMA
 │   └── metrics.py          # ClassificationMetrics
-├── scripts/                # nạp dataset, checkpoint pretrain, upload best.pt lên Google Drive (hàm, gọi từ notebook)
+├── scripts/                # nạp dataset, checkpoint pretrain, group map, teacher cache (FRCRN -> BEATs -> probe), upload best.pt lên Google Drive (hàm, gọi từ notebook)
 ├── notebook/               # beat-v1.ipynb (FRCRN fine-tune + BEATs), beat-v2.ipynb (BEATs + masking từ pretrained/frcrn_best.pt), ced-v1.ipynb (chưng cất BEATs -> CED-Mini, chưa dùng masking), vlsp-v1.ipynb (fine-tune FRCRN trên giọng nói VLSP-100h trộn nhiễu AudioSet-40l; khi `RUN_TRAINING = True` trên GPU tự dò batch size lớn nhất trong `batch_candidates` của `config/frcrn.yaml`, và mỗi best mới được ghi đè thành `best.pt` tại `FA26_Capstone/Truong/FRCRN_vlsp` trên Google Drive)
 ├── tests/                  # pytest
 ├── doc/                    # tài liệu, tiêu chí đánh giá repo

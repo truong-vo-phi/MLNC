@@ -110,6 +110,9 @@ class Trainer(ABC):
     def on_no_improvement(self, epoch: int, stale: int) -> None:
         pass
 
+    def end_epoch(self, epoch: int) -> None:
+        pass
+
     def snapshot(self) -> dict[str, Tensor]:
         return copy.deepcopy(self.checkpoint_module.state_dict())
 
@@ -183,6 +186,7 @@ class Trainer(ABC):
                 break
             if stale:
                 self.on_no_improvement(epoch, stale)
+            self.end_epoch(epoch)
 
         self.restore_best()
         self.model.eval()

@@ -6,9 +6,9 @@ import logging
 import os
 import zlib
 from abc import ABC, abstractmethod
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from functools import cache
-from math import gcd
+from math import ceil, gcd
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -18,11 +18,12 @@ import torch
 import yaml
 from scipy.signal import resample_poly
 from torch import Tensor
-from torch.utils.data import DataLoader, Dataset, Subset
+from torch.utils.data import DataLoader, Dataset, Sampler, Subset
 
 ROOT = Path(__file__).resolve().parents[1]
 URL_CONFIG = ROOT / "config" / "url.yaml"
 LABELS_FALLBACK = ROOT / "config" / "audioset_40_labels.csv"
+GROUP_MAP_FALLBACK = ROOT / "config" / "group_map.json"
 AUDIOSET_KEY = "audioset-40l"
 MIXTURE_KEY = "mixture-36l"
 VLSP_KEY = "vlsp-100h"
@@ -30,6 +31,7 @@ VLSP_CONFIG = ROOT / "config" / "vlsp.yaml"
 AUDIO_EXTENSIONS = (".wav", ".flac")
 SAMPLE_RATE = 16000
 ALL_SNR = (-5, 0, 5, 10, 15, 20)
+TEACHER_CACHE_DIR = "cache"
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,10 @@ class AudioItem(TypedDict, total=False):
     sample_id: str
     noise: Tensor
     clean: Tensor
+    label: Tensor
+    group: Tensor
+    noise_ytid: str
+    teacher_logits36: Tensor
 
 
 def dataset_env_name(key: str) -> str:
@@ -247,6 +253,62 @@ class Mixture36Dataset(LabeledAudioDataset):
         return item
 
 
+class KDMoEMixDataset(Mixture36Dataset):
+    """Mixture-36l kèm nhãn, nhóm expert, noise_ytid và logit teacher đọc từ cache."""
+
+    def __init__(
+        self,
+        root: str | Path | None = None,
+        split: str = "train",
+        sample_rate: int = SAMPLE_RATE,
+        duration: float | None = 4.0,
+        teacher_cache: str | Path | None = None,
+        group_map: str | Path | None = None,
+        snr_db: tuple[float, ...] | None = None,
+    ) -> None:
+        super().__init__(root, split, sample_rate, duration, load_noise=True, snr_db=snr_db)
+        group_map_path = Path(group_map) if group_map else GROUP_MAP_FALLBACK
+        with open(group_map_path, encoding="utf-8") as f:
+            mid_to_group = json.load(f)["mid_to_group"]
+        self._labels: list[int] = []
+        self._groups: list[int] = []
+        for row in self.rows:
+            mid = row["label_mids"].split(",")[0].strip()
+            if mid not in mid_to_group:
+                raise KeyError(f"mid {mid!r} of sample {row['sample_id']} is not in {group_map_path}")
+            self._labels.append(int(np.argmax(json.loads(row["multi_hot_36"]))))
+            self._groups.append(int(mid_to_group[mid]))
+        self._teacher_logits = self._load_teacher_cache(teacher_cache, split)
+
+    def _load_teacher_cache(self, teacher_cache: str | Path | None, split: str) -> dict[str, np.ndarray] | None:
+        path = Path(teacher_cache) if teacher_cache else self.root / TEACHER_CACHE_DIR / f"teacher_{split}.npz"
+        if not path.is_file():
+            logger.warning("%s: teacher cache %s not found, teacher_logits36 filled with zeros", split, path)
+            return None
+        with np.load(path) as data:
+            return dict(zip(data["mix_id"].tolist(), data["logits36"], strict=True))
+
+    @property
+    def labels(self) -> list[int]:
+        return self._labels
+
+    @property
+    def groups(self) -> list[int]:
+        return self._groups
+
+    def __getitem__(self, index: int) -> AudioItem:
+        item = super().__getitem__(index)
+        item["label"] = torch.tensor(self._labels[index], dtype=torch.long)
+        item["group"] = torch.tensor(self._groups[index], dtype=torch.long)
+        item["noise_ytid"] = self.rows[index]["noise_ytid"]
+        logits = self._teacher_logits.get(item["sample_id"]) if self._teacher_logits else None
+        if logits is None:
+            item["teacher_logits36"] = torch.zeros(len(self.class_names))
+        else:
+            item["teacher_logits36"] = torch.from_numpy(np.asarray(logits, dtype=np.float32))
+        return item
+
+
 class DynamicMixDataset(AudioDataset):
     dataset_key = MIXTURE_KEY
 
@@ -360,6 +422,70 @@ class VLSPMixDataset(DynamicMixDataset):
         return vlsp_files(self.root, split, self.split_ratios)
 
 
+class PairedClipSampler(Sampler[list[int]]):
+    """Batch = 32 đơn vị clip nhiễu; clip có >= 2 mix góp thành cặp, clip 1 mix đi đơn.
+
+    Mỗi epoch: chia mix của từng clip thành các cặp rời nhau (còn lại đi đơn),
+    xáo theo nhãn rồi xen kẽ các nhãn để batch cân bằng nhãn.
+    """
+
+    def __init__(self, dataset: KDMoEMixDataset, units_per_batch: int = 32, seed: int = 0) -> None:
+        if units_per_batch < 1:
+            raise ValueError(f"units_per_batch must be positive, got {units_per_batch}")
+        self.units_per_batch = units_per_batch
+        self.seed = seed
+        self.epoch = 0
+        if hasattr(dataset, "indices"):
+            base = dataset.dataset
+            rows = [base.rows[index] for index in dataset.indices]
+            labels = [base.labels[index] for index in dataset.indices]
+        else:
+            rows = list(dataset.rows)
+            labels = list(dataset.labels)
+        self._clips: dict[str, list[int]] = {}
+        self._clip_label: dict[str, int] = {}
+        for position, row in enumerate(rows):
+            self._clips.setdefault(row["noise_ytid"], []).append(position)
+        for ytid, positions in self._clips.items():
+            self._clip_label[ytid] = labels[positions[0]]
+        self._num_units = sum(len(indices) // 2 + len(indices) % 2 for indices in self._clips.values())
+
+    def _units(self, rng: np.random.Generator) -> list[tuple[int, ...]]:
+        per_label: dict[int, list[tuple[int, ...]]] = {}
+        for ytid in sorted(self._clips):
+            indices = list(self._clips[ytid])
+            rng.shuffle(indices)
+            units = per_label.setdefault(self._clip_label[ytid], [])
+            for start in range(0, len(indices) - 1, 2):
+                units.append((indices[start], indices[start + 1]))
+            if len(indices) % 2:
+                units.append((indices[-1],))
+        for units in per_label.values():
+            rng.shuffle(units)
+        ordered: list[tuple[int, ...]] = []
+        streams = [iter(units) for units in per_label.values()]
+        while streams:
+            for stream in list(streams):
+                unit = next(stream, None)
+                if unit is None:
+                    streams.remove(stream)
+                else:
+                    ordered.append(unit)
+        return ordered
+
+    def __iter__(self) -> Iterator[list[int]]:
+        rng = np.random.default_rng(self.seed + self.epoch)
+        units = self._units(rng)
+        self.epoch += 1
+        for start in range(0, len(units), self.units_per_batch):
+            indices = [index for unit in units[start : start + self.units_per_batch] for index in unit]
+            if indices:
+                yield indices
+
+    def __len__(self) -> int:
+        return ceil(self._num_units / self.units_per_batch)
+
+
 def build_dataset(name: str, split: str, **kwargs: Any) -> AudioDataset:
     builders: dict[str, type[AudioDataset]] = {
         AUDIOSET_KEY: AudioSet40Dataset,
@@ -371,15 +497,22 @@ def build_dataset(name: str, split: str, **kwargs: Any) -> AudioDataset:
     return builders[name](split=split, **kwargs)
 
 
-def build_dataloader(dataset: Dataset, batch_size: int, shuffle: bool = False, num_workers: int = 0) -> DataLoader:
+def build_dataloader(
+    dataset: Dataset,
+    batch_size: int | None,
+    shuffle: bool = False,
+    num_workers: int = 0,
+    batch_sampler: Sampler[list[int]] | None = None,
+) -> DataLoader:
     return DataLoader(
         dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
+        batch_size=1 if batch_sampler is not None else batch_size,
+        shuffle=False if batch_sampler is not None else shuffle,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
-        drop_last=shuffle,
+        drop_last=shuffle and batch_sampler is None,
         persistent_workers=num_workers > 0,
+        batch_sampler=batch_sampler,
     )
 
 

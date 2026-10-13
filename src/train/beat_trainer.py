@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import copy
 import logging
 import math
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, ClassVar
 
+import numpy as np
 import torch
 from torch import Tensor
 from torch.optim import AdamW
@@ -46,8 +49,11 @@ class BEATTrainer(Trainer):
         name: str,
         checkpoint_path: str | Path,
         separator: FRCRNSeparator | None = None,
+        resume_path: str | Path | None = None,
+        drive_backup: Callable[[str | Path], None] | None = None,
+        on_checkpoint: Callable[[Path, int, float], None] | None = None,
     ) -> None:
-        super().__init__(model, config, device, logger, name, checkpoint_path)
+        super().__init__(model, config, device, logger, name, checkpoint_path, on_checkpoint)
         self.separator = separator.to(device).freeze() if separator is not None else None
         self.criterion = CrossEntropyLoss(config.label_smoothing)
         self._train_metrics = ClassificationMetrics(num_classes=self.num_classes)
@@ -55,6 +61,18 @@ class BEATTrainer(Trainer):
         self._logits: Tensor | None = None
         self._correct = 0
         self._seen = 0
+        self.resume_path = Path(resume_path) if resume_path else None
+        self.drive_backup = drive_backup
+        self._completed_epochs = 0
+        self._current_epoch = 0
+        self._in_fit = False
+        self._history: list[dict[str, Any]] = []
+        self._resume_state: dict[str, Any] | None = None
+        self._resumed_best_state: dict[str, Tensor] | None = None
+
+    @property
+    def history(self) -> list[dict[str, Any]]:
+        return self._history
 
     @property
     def num_classes(self) -> int:
@@ -71,6 +89,66 @@ class BEATTrainer(Trainer):
         self.scheduler = cosine_with_warmup(
             self.optimizer, total_steps, self.config.warmup_ratio, self.config.min_lr_ratio
         )
+        self._apply_resume_state()
+
+    def _apply_resume_state(self) -> None:
+        if self._resume_state is None:
+            return
+        self.optimizer.load_state_dict(self._resume_state["optimizer"])
+        if self.scheduler is not None and self._resume_state.get("scheduler") is not None:
+            self.scheduler.load_state_dict(self._resume_state["scheduler"])
+        self._resume_state = None
+        self.logger.info("resume: optimizer/scheduler khôi phục từ epoch %d", self._completed_epochs)
+
+    def save_resume(self, path: str | Path | None = None) -> Path:
+        if self.optimizer is None or self._current_epoch == 0:
+            raise ValueError("configure_optimizer and run_epoch must run before save_resume")
+        path = Path(path) if path else self.resume_path
+        if path is None:
+            raise ValueError("resume_path is not set")
+        payload = {
+            "epoch": self._current_epoch,
+            "model": self.model.state_dict(),
+            "optimizer": self.optimizer.state_dict(),
+            "scheduler": self.scheduler.state_dict() if self.scheduler is not None else None,
+            "best_score": self._best_score,
+            "best_epoch": self._best_epoch,
+            "best_state": copy.deepcopy(self._best_state) if self._best_state is not None else None,
+            "history": self._history,
+        }
+        partial = path.with_name(path.name + ".part")
+        torch.save(payload, partial)
+        os.replace(partial, path)
+        return path
+
+    def load_resume(self, path: str | Path) -> None:
+        data = torch.load(path, map_location="cpu", weights_only=False)
+        self.model.load_state_dict(data["model"])
+        self._completed_epochs = int(data["epoch"])
+        self._best_score = float(data.get("best_score", -float("inf")))
+        self._best_epoch = int(data.get("best_epoch", 0))
+        self._history = list(data.get("history", []))
+        self._resumed_best_state = data.get("best_state")
+        self._resume_state = data
+        self.logger.info(
+            "resume: BEATs fine-tune từ epoch %d (best %.4f @ %d)",
+            self._completed_epochs,
+            self._best_score,
+            self._best_epoch,
+        )
+
+    def snapshot(self) -> dict[str, Tensor]:
+        if self._resumed_best_state is not None:
+            state, self._resumed_best_state = copy.deepcopy(self._resumed_best_state), None
+            return state
+        return super().snapshot()
+
+    def run_epoch(self, loader: DataLoader, epoch: int) -> dict[str, float]:
+        if epoch <= self._completed_epochs:
+            return {}
+        self._current_epoch = epoch
+        self._in_fit = True
+        return super().run_epoch(loader, epoch)
 
     def prepare(self, batch: dict[str, Any]) -> tuple[Tensor, Tensor]:
         waveform = batch["waveform"].to(self.device)
@@ -100,14 +178,32 @@ class BEATTrainer(Trainer):
 
     def evaluate(self, loader: DataLoader, desc: str = "evaluate") -> dict[str, float]:
         self.model.eval()
-        return self._evaluate_with(self.model.predict_proba, loader, desc)
+        scores = self._evaluate_with(self.model.predict_proba, loader, desc)
+        if self._in_fit and self._current_epoch > 0:
+            self._history.append(
+                {"epoch": self._current_epoch, **{f"val_{key}": value for key, value in scores.items()}}
+            )
+            if self.resume_path is not None:
+                self.save_resume(self.resume_path)
+                if self.drive_backup is not None:
+                    self.drive_backup(self.resume_path)
+        return scores
 
-    @torch.no_grad()
+    def confusion_matrix(self, loader: DataLoader, desc: str = "confusion") -> np.ndarray:
+        self.model.eval()
+        return self._collect(self.model.predict_proba, loader, desc).confusion_matrix()
+
     def _evaluate_with(
         self, predict_proba: Callable[[Tensor], Tensor], loader: DataLoader, desc: str
     ) -> dict[str, float]:
+        return self._collect(predict_proba, loader, desc).compute().to_dict()
+
+    @torch.no_grad()
+    def _collect(
+        self, predict_proba: Callable[[Tensor], Tensor], loader: DataLoader, desc: str
+    ) -> ClassificationMetrics:
         metrics = ClassificationMetrics(num_classes=self.num_classes)
         for batch in tqdm(loader, desc=desc, unit="batch", leave=False, dynamic_ncols=True):
             waveform, labels = self.prepare(batch)
             metrics.update(labels, predict_proba(waveform))
-        return metrics.compute().to_dict()
+        return metrics

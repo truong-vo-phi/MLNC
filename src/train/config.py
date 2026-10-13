@@ -48,3 +48,22 @@ class CEDTrainConfig(BEATTrainConfig):
     warmup_ratio: float = 0.025
     min_lr_ratio: float = 0.1
     kd_temperature: float = 4.0
+
+
+@dataclass(frozen=True)
+class KDMoETrainConfig(TrainConfig):
+    lr: float = 5e-4
+    weight_decay: float = 0.05
+    betas: tuple[float, float] = (0.9, 0.999)
+    warmup_ratio: float = 0.05
+    min_lr: float = 1e-6
+    grad_clip: float = 1.0
+    batch_size: int = 64
+    eval_batch_size: int = 64
+    epochs: int = 120
+    patience: int = 15
+    stage1_epochs: int = 8
+    ema_decay: float = 0.999
+    amp: str = "bf16"
+    seed: int = 42
+    resume_every: int = 1

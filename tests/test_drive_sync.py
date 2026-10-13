@@ -1,7 +1,13 @@
 import logging
 import time
 
-from scripts.drive_sync import BEST_FILENAME, DRIVE_FRCRN_VLSP_DIR, DriveCheckpointUploader, DriveLogUploader
+from scripts.drive_sync import (
+    BEST_FILENAME,
+    DRIVE_FRCRN_VLSP_DIR,
+    DriveCheckpointUploader,
+    DriveFileBackup,
+    DriveLogUploader,
+)
 
 
 class FakeDrive:
@@ -87,3 +93,22 @@ def test_log_uploader_flushes_trailing_lines_after_interval(tmp_path):
         time.sleep(0.05)
     uploader.close()
     assert len(drive.puts) == 2
+
+
+def test_drive_file_backup_uploads_and_strips_paths(tmp_path, caplog):
+    drive = FakeDrive()
+    backup = DriveFileBackup(drive, "/kd-moe/stage2/", "resume.pt", logging.getLogger("drive-test"))
+    local = tmp_path / "resume.pt"
+    local.write_bytes(b"state")
+    with caplog.at_level(logging.INFO, logger="drive-test"):
+        backup(local)
+    assert backup.remote_path == "kd-moe/stage2/resume.pt"
+    assert drive.puts == [(str(local), "kd-moe/stage2/resume.pt")]
+    assert "drive backup" in caplog.text
+
+
+def test_drive_file_backup_swallows_errors(tmp_path, caplog):
+    backup = DriveFileBackup(FakeDrive(fail=True), "kd-moe", "resume.pt", logging.getLogger("drive-test"))
+    with caplog.at_level(logging.WARNING, logger="drive-test"):
+        backup(tmp_path / "resume.pt")
+    assert "drive backup failed" in caplog.text

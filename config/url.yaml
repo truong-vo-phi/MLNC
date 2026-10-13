@@ -1,3 +1,4 @@
+beats-pretrain: https://huggingface.co/lpepino/beats_ckpts/resolve/main/BEATs_iter3_plus_AS2M.pt?download=true
 beat-pretrain: https://huggingface.co/WeiChihChen/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2/resolve/main/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt?download=true
 frcrn-pretrain: https://huggingface.co/alibabasglab/FRCRN_SE_16K/resolve/main/last_best_checkpoint.pt
 ced-mini-pretrain: https://huggingface.co/mispeech/ced-mini/resolve/main/model.safetensors

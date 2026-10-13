@@ -8,6 +8,8 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import MaxNLocator
 
 SURFACE = "#fcfcfb"
@@ -158,6 +160,29 @@ def plot_test_metrics(results: dict[str, dict[str, Any]], snr_groups: Sequence[s
         for masking, color in ((False, BLUE), (True, ORANGE))
     ]
     return _plot_grouped_test(results, snr_groups, path, TEST_METRICS, series, 4.2, ylim=(0, 1.05))
+
+
+def plot_confusion_matrix(matrix: np.ndarray, class_names: Sequence[str], path: Path, title: str) -> Path:
+    if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1] or matrix.shape[0] != len(class_names):
+        raise ValueError("matrix must be square with one row per class name")
+    row_totals = matrix.sum(axis=1, keepdims=True)
+    rates = np.divide(matrix, row_totals, out=np.zeros(matrix.shape, dtype=np.float64), where=row_totals > 0)
+    size = max(6.0, 0.32 * len(class_names) + 2.5)
+    fig, axes = _figure(1, 1, size, size)
+    ax = axes[0][0]
+    image = ax.imshow(rates, cmap=LinearSegmentedColormap.from_list("confusion", [SURFACE, BLUE]), vmin=0.0, vmax=1.0)
+    ticks = list(range(len(class_names)))
+    ax.set_xticks(ticks, class_names, rotation=90)
+    ax.set_yticks(ticks, class_names)
+    ax.tick_params(colors=TEXT_SECONDARY, labelsize=7)
+    ax.set_xlabel("predicted", color=TEXT_SECONDARY)
+    ax.set_ylabel("true", color=TEXT_SECONDARY)
+    ax.set_title(f"{title} | n={int(matrix.sum())}", fontsize=10, loc="left", color=TEXT_PRIMARY)
+    colorbar = fig.colorbar(image, ax=ax, fraction=0.046, pad=0.02)
+    colorbar.set_label("share of true class", color=TEXT_SECONDARY)
+    colorbar.ax.tick_params(colors=TEXT_SECONDARY, labelsize=8)
+    fig.tight_layout()
+    return _save(fig, path)
 
 
 def plot_frcrn_curve(result: dict[str, Any], path: Path) -> Path:

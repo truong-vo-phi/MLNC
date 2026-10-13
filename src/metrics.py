@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from typing import Any
 
 import numpy as np
 
 _TOP_K = 3
+
+
+@dataclass(frozen=True)
+class ConfusionPair:
+    true_label: str
+    predicted_label: str
+    count: int
+    rate: float
 
 
 @dataclass(frozen=True)
@@ -78,6 +87,35 @@ def _binary_ap(labels: np.ndarray, scores: np.ndarray) -> float:
     return float(ap)
 
 
+def confusion_matrix(y_true: Any, y_pred: Any, num_classes: int) -> np.ndarray:
+    y_true = _to_numpy(y_true).astype(np.int64).ravel()
+    y_pred = _to_numpy(y_pred).astype(np.int64).ravel()
+    if y_true.shape != y_pred.shape:
+        raise ValueError("y_true and y_pred must have the same number of samples")
+    if not (np.all((y_true >= 0) & (y_true < num_classes)) and np.all((y_pred >= 0) & (y_pred < num_classes))):
+        raise ValueError("labels out of range")
+    counts = np.bincount(y_true * num_classes + y_pred, minlength=num_classes * num_classes)
+    return counts.reshape(num_classes, num_classes)
+
+
+def top_confusions(matrix: np.ndarray, class_names: Sequence[str], top_n: int = 10) -> list[ConfusionPair]:
+    if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1] or matrix.shape[0] != len(class_names):
+        raise ValueError("matrix must be square with one row per class name")
+    off_diagonal = matrix.copy()
+    np.fill_diagonal(off_diagonal, 0)
+    row_totals = matrix.sum(axis=1)
+    order = np.argsort(-off_diagonal, axis=None, kind="mergesort")
+    pairs = []
+    for flat in order[:top_n]:
+        true_index, predicted_index = divmod(int(flat), matrix.shape[1])
+        count = int(off_diagonal[true_index, predicted_index])
+        if count == 0:
+            break
+        rate = count / int(row_totals[true_index])
+        pairs.append(ConfusionPair(class_names[true_index], class_names[predicted_index], count, rate))
+    return pairs
+
+
 def _safe_mean(values: list[float]) -> float:
     if not values:
         return float("nan")
@@ -117,6 +155,12 @@ class ClassificationMetrics:
         if self.num_classes is not None:
             return self.num_classes
         return self._y_score[0].shape[1]
+
+    def confusion_matrix(self) -> np.ndarray:
+        if not self._y_true:
+            raise ValueError("no samples recorded, call update() first")
+        y_score = np.concatenate(self._y_score)
+        return confusion_matrix(np.concatenate(self._y_true), np.argmax(y_score, axis=1), self._num_classes)
 
     def compute(self) -> MetricsResult:
         if not self._y_true:
