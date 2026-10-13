@@ -59,7 +59,7 @@ train:
   batch_size: 64
   eval_batch_size: 64
   epochs: 120
-  patience: 15
+  patience: 13
   stage1_epochs: 8
   ema_decay: 0.999
   amp: bf16
