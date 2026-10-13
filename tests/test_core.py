@@ -6,11 +6,10 @@ from torch import nn
 
 from src.core import BaseConfig, BaseModel, LoadReport
 from src.loss import (
-    CRDLoss,
     CrossEntropyLoss,
     DistillationLoss,
     FRCRNLoss,
-    KDLoss,
+    RouterKDLoss,
     SeparationLoss,
     SupervisedLoss,
 )
@@ -89,10 +88,10 @@ def test_models_share_interface():
 
 def test_loss_hierarchy():
     assert issubclass(CrossEntropyLoss, SupervisedLoss)
-    assert issubclass(KDLoss, DistillationLoss) and issubclass(CRDLoss, DistillationLoss)
+    assert issubclass(RouterKDLoss, DistillationLoss)
     assert issubclass(FRCRNLoss, SeparationLoss)
-    names = {loss.name for loss in (CrossEntropyLoss, KDLoss, CRDLoss, FRCRNLoss)}
-    assert len(names) == 4
+    names = {loss.name for loss in (CrossEntropyLoss, RouterKDLoss, FRCRNLoss)}
+    assert len(names) == 3
 
 
 def test_trainers_share_template():

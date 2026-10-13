@@ -1,7 +1,7 @@
 # MLNC
 
-Phân loại nhiễu dưới giọng nói: **FRCRN** (tách nhiễu bằng masking) + **BEATs** (phân loại), huấn luyện trên
-AudioSet-40l và Mixture-36l.
+Phân loại nhiễu dưới giọng nói: **FRCRN** (tách nhiễu bằng masking) + **BEATs** (phân loại) làm teacher, chưng cất vào
+student **KD-MoE** nhỏ gọn; huấn luyện trên AudioSet-40l và Mixture-36l.
 
 ## Cấu trúc
 
@@ -9,7 +9,6 @@ AudioSet-40l và Mixture-36l.
 MLNC/
 ├── config/                 # hyperparameters và đường dẫn (yaml)
 │   ├── beat.yaml           # BEATs: kiến trúc, frontend, train, loss
-│   ├── ced.yaml            # CED-Mini: kiến trúc, frontend, train chưng cất
 │   ├── kdmoe_s.yaml        # KD-MoE cấu hình S (d 128, ~1.25M tham số), kèm M/L
 │   ├── group_map.json      # ánh xạ mid -> label_index -> nhóm expert E0-E3 (kèm membership.npy)
 │   ├── vlsp.yaml           # tỉ lệ chia train/validation/test cho VLSP-100h
@@ -18,16 +17,15 @@ MLNC/
 │   └── audioset_40_labels.csv  # 40 nhãn AudioSet, dùng khi dataset thiếu metadata/40_noise_labels.csv
 ├── src/
 │   ├── core/               # lớp cơ sở: BaseConfig, BaseModel, LoadReport
-│   ├── model/beat/         # BEATs base (patch embed, encoder, attention, head) và BEATTeacher (predictor 527 lớp)
-│   ├── model/ced/          # CED-Mini (mel frontend, patch embed, attention, encoder, backbone, head)
+│   ├── model/beat/         # BEATs base (patch embed, encoder, attention, head)
 │   ├── model/frcrn/        # FRCRN (UNet phức x2, STFT, separator)
 │   ├── model/kdmoe/        # KD-MoE student lai cascade (log-mel, khối lai, cổng, ViT, BiGRU, router, 4 expert)
-│   ├── loss/               # base + cross_entropy, kd, crd, frcrn, kdmoe (RouterKD, Front, Consistency)
-│   ├── train/              # Trainer (template method) + BEATTrainer, CEDTrainer (chưng cất), FRCRNTrainer, KDMoETrainer (2 giai đoạn), config
+│   ├── loss/               # base + cross_entropy, frcrn, kdmoe (RouterKD, Front, Consistency)
+│   ├── train/              # Trainer (template method) + BEATTrainer, FRCRNTrainer, KDMoETrainer (2 giai đoạn), config
 │   ├── utils/              # logger, seed, checkpoint, paths, plots, EMA
 │   └── metrics.py          # ClassificationMetrics
 ├── scripts/                # nạp dataset, checkpoint pretrain, group map, teacher cache (FRCRN -> BEATs -> probe), upload best.pt lên Google Drive (hàm, gọi từ notebook)
-├── notebook/               # beat-v1.ipynb (FRCRN fine-tune + BEATs), beat-v2.ipynb (BEATs + masking từ pretrained/frcrn_best.pt), ced-v1.ipynb (chưng cất BEATs -> CED-Mini, chưa dùng masking), vlsp-v1.ipynb (fine-tune FRCRN trên giọng nói VLSP-100h trộn nhiễu AudioSet-40l; khi `RUN_TRAINING = True` trên GPU tự dò batch size lớn nhất trong `batch_candidates` của `config/frcrn.yaml`, và mỗi best mới được ghi đè thành `best.pt` tại `FA26_Capstone/Truong/FRCRN_vlsp` trên Google Drive)
+├── notebook/               # kd-moe.ipynb: pipeline đầy đủ (tải dữ liệu, nạp pretrain, fine-tune FRCRN -> BEATs, teacher p_t, student KD-MoE 2 stage, 9 metrics)
 ├── tests/                  # pytest
 ├── doc/                    # tài liệu, tiêu chí đánh giá repo
 ├── skill/guide.MD          # quy định cấu trúc đầu ra và notebook
@@ -61,7 +59,7 @@ Nếu cần GPU, cài PyTorch bản CUDA trước theo hướng dẫn của PyTo
 | `audioset-40l` | `audio/` (wav) và `metadata/` (manifest, `40_noise_labels.csv`) |
 | `mixture-36l` | `train/`, `validation/`, `test/` (mỗi split có `manifest.csv`), `labels.txt` |
 | `vlsp-100h` | chỉ cần file audio (wav/flac) ở bất kỳ thư mục con nào; split chia theo hash đường dẫn, tỉ lệ ở `config/vlsp.yaml` |
-| `beat-pretrain`, `frcrn-pretrain`, `ced-mini-pretrain` | URL checkpoint pretrain |
+| `beats-pretrain`, `frcrn-pretrain` | URL checkpoint pretrain (HuggingFace) |
 | `kaggle-*` | slug dataset Kaggle, dùng khi dataset chưa có (token đọc từ biến môi trường `KAGGLE_ACCESS_TOKEN`) |
 
 Biến môi trường `MLNC_AUDIOSET_40L`, `MLNC_MIXTURE_36L` và `MLNC_VLSP_100H` ghi đè đường dẫn trong `url.yaml`. Cell nạp dataset gọi `ensure_dataset`:
@@ -69,11 +67,15 @@ nếu đường dẫn trong `url.yaml` không tồn tại thì dùng hoặc tả
 
 ## Chạy
 
-Mở [notebook/beat-v1.ipynb](notebook/beat-v1.ipynb):
+Mở [notebook/kd-moe.ipynb](notebook/kd-moe.ipynb) (hoặc `kd-moe.ipynb.py` với marimo):
 
-- `RUN_TRAINING = False`: smoke test nhanh, lịch sử lưu vào `output/test/`.
-- `RUN_TRAINING = True`: chạy thật, 4 nhóm SNR (low, mid, high, all) x (có/không masking) = 8 kịch bản, lưu vào `output/`.
-- `RESUME_RUN_ID = "<experiment>-<timestamp>"`: chạy tiếp một lần chạy trước (bỏ qua phần đã xong).
+1. Tải Mixture-36l / AudioSet-40l / VLSP-100h từ Kaggle (tự bỏ qua nếu đã có).
+2. Nạp pretrain FRCRN (Google Drive) + BEATs (HuggingFace), đóng băng.
+3. Fine-tune FRCRN (SI-SNR) rồi BEATs (mask bằng FRCRN, chọn theo `macro_f1`).
+4. Teacher p_t: embedding BEATs + linear probe cross-fit 5 fold, lưu `teacher_{split}.npz`.
+5. Student KD-MoE: stage 1 (`L_front`) rồi stage 2 (CE + KD router + front + consistency).
+
+Mọi giai đoạn có resume theo epoch và sao lưu `best.pt`/`result.json` lên Google Drive.
 
 ## Kiểm thử và chất lượng mã
 

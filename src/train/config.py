@@ -42,15 +42,6 @@ class BEATTrainConfig(TrainConfig):
 
 
 @dataclass(frozen=True)
-class CEDTrainConfig(BEATTrainConfig):
-    lr: float = 1e-3
-    betas: tuple[float, float] = (0.9, 0.999)
-    warmup_ratio: float = 0.025
-    min_lr_ratio: float = 0.1
-    kd_temperature: float = 4.0
-
-
-@dataclass(frozen=True)
 class KDMoETrainConfig(TrainConfig):
     lr: float = 5e-4
     weight_decay: float = 0.05
