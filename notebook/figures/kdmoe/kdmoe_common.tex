@@ -1,0 +1,30 @@
+% Phần dùng chung cho các sơ đồ KD-MoE. Biên dịch: xelatex fig_*.tex (chạy trong thư mục này).
+\usepackage{fontspec}
+\setmainfont{Arial}
+\setsansfont{Arial}
+\usepackage{amsmath,amssymb}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc}
+
+% Bảng màu (an toàn cho mù màu): student xanh, teacher xám, loss cam, nhánh phụ chỉ khi train xanh lá.
+\definecolor{cStu}{HTML}{4C78A8}
+\definecolor{cTea}{HTML}{7F7F7F}
+\definecolor{cLoss}{HTML}{E8801A}
+\definecolor{cAux}{HTML}{3F9B4A}
+\definecolor{cMoE}{HTML}{8E5EA2}
+\definecolor{cStage}{HTML}{E9C46A}
+
+\tikzset{
+  >={Stealth[length=5pt,width=4pt]},
+  base/.style={rectangle,rounded corners=2.5pt,line width=0.7pt,align=center,font=\footnotesize,
+               inner sep=4pt,minimum height=0.95cm},
+  blk/.style={base,draw=#1!80!black,fill=#1!12},
+  aux/.style={base,draw=cAux!80!black,fill=cAux!10,dashed},
+  loss/.style={base,draw=cLoss!85!black,fill=cLoss!14,rounded corners=8pt},
+  sum/.style={circle,draw=black!70,fill=white,line width=0.7pt,inner sep=0pt,minimum size=0.55cm,font=\footnotesize},
+  lbl/.style={font=\scriptsize,text=black!65,anchor=west},
+  flow/.style={->,line width=0.8pt,black!75},
+  trainonly/.style={->,line width=0.8pt,dashed,black!60},
+  kd/.style={->,line width=1.2pt,dashed,cLoss!90!black},
+  panel/.style={rectangle,rounded corners=6pt,draw=#1!60,fill=#1!5,line width=0.8pt,inner sep=9pt},
+  ptitle/.style={font=\small\bfseries,anchor=north west},
+}

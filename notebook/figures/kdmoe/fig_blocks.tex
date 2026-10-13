@@ -1,0 +1,86 @@
+% Sơ đồ 3: ruột của ba khối chính: HybridBlock, FreqPoolGRU và Router + Expert.
+\documentclass[tikz,border=8pt]{standalone}
+\input{kdmoe_common}
+\begin{document}
+
+% ================= (a) HybridBlock =================
+\begin{tikzpicture}
+\node[blk=cStu,text width=3.4cm] (xin) at (0,0) {$x$ (B, 8, 24, $d$)};
+\node[blk=cStu,text width=3.0cm,minimum height=0.8cm] (ln1) at (0,-1.4) {LayerNorm $\to u$};
+\node[blk=cStu,text width=3.0cm,minimum height=1.2cm] (att) at (-2.05,-3.2) {\textbf{MHSA toàn cục}\\[1.5pt]\scriptsize reshape (B, 192, $d$)\\[1.5pt]\scriptsize 192 token cùng nhìn nhau};
+\node[blk=cStu,text width=3.0cm,minimum height=1.2cm] (gru) at (2.05,-3.2) {\textbf{BiGRU theo thời gian}\\[1.5pt]\scriptsize reshape (B$\cdot$8, 24, $d$)\\[1.5pt]\scriptsize proj = Id nếu $2h=d$};
+\node[blk=cStu,text width=1.5cm,minimum height=0.6cm,inner sep=2pt] (sa) at (-2.05,-4.7) {$\times\,a_{att}$};
+\node[blk=cStu,text width=1.5cm,minimum height=0.6cm,inner sep=2pt] (sg) at (2.05,-4.7) {$\times\,a_{gru}$};
+\node[sum] (add1) at (0,-5.9) {$+$};
+\node[blk=cStu,text width=2.0cm,minimum height=0.6cm,inner sep=2pt] (dp1) at (0,-6.9) {DropPath};
+\node[sum] (r1) at (0,-8.0) {$+$};
+\node[blk=cStu,text width=3.0cm,minimum height=0.8cm] (ln2) at (0,-9.2) {LayerNorm};
+\node[blk=cStu,text width=3.4cm,minimum height=0.9cm] (ffn) at (0,-10.5) {\textbf{FFN}\\[1.5pt]\scriptsize $d\to4d\to d$, GELU};
+\node[blk=cStu,text width=2.0cm,minimum height=0.6cm,inner sep=2pt] (dp2) at (0,-11.7) {DropPath};
+\node[sum] (r2) at (0,-12.8) {$+$};
+\node[blk=cStu,text width=3.4cm] (yout) at (0,-14.0) {$y$ (B, 8, 24, $d$)};
+\draw[flow] (xin) -- (ln1);
+\draw[flow] (ln1.south) -- ++(0,-0.3) -| (att.north);
+\draw[flow] (ln1.south) -- ++(0,-0.3) -| (gru.north);
+\draw[flow] (att) -- (sa); \draw[flow] (gru) -- (sg);
+\draw[flow] (sa.south) |- (add1.west); \draw[flow] (sg.south) |- (add1.east);
+\draw[flow] (add1) -- (dp1); \draw[flow] (dp1) -- (r1);
+\draw[flow] (r1) -- (ln2); \draw[flow] (ln2) -- (ffn); \draw[flow] (ffn) -- (dp2);
+\draw[flow] (dp2) -- (r2); \draw[flow] (r2) -- (yout);
+\draw[flow] (xin.west) -- (-4.5,0) |- (r1.west);
+\draw[flow] (r1.east) -- (3.2,-8.0) |- (r2.east);
+\coordinate (aTop) at (-4.9,1.3);
+\begin{scope}[on background layer]
+  \node[panel=cStu,fit=(xin)(yout)(aTop)(att)(gru)] (pa) {};
+\end{scope}
+\node[ptitle] at ($(pa.north west)+(0.15,-0.1)$) {(a) HybridBlock $\times 2$};
+\end{tikzpicture}
+
+% ================= (b) FreqPoolGRU =================
+\begin{tikzpicture}
+\node[blk=cStu,text width=3.6cm] (hin) at (0,0) {$H$ (B, 8, 24, $d$)\\[1.5pt]\scriptsize sau ViT và LayerNorm};
+\node[blk=cStu,text width=4.0cm,minimum height=1.0cm] (mean) at (0,-1.7) {\textbf{mean trên trục tần số}\\[1.5pt]\scriptsize 8 dải $\to$ 1, (B, 24, $d$)};
+\node[blk=cStu,text width=4.4cm,minimum height=1.1cm] (g) at (0,-3.5) {\textbf{BiGRU 1 tầng}\\[1.5pt]\scriptsize $d\to h$ mỗi hướng\\[1.5pt]\scriptsize seq (B, 24, $2h$)};
+\node[blk=cStu,text width=2.4cm,minimum height=1.7cm] (fw) at (-3.9,-6.0) {hướng thuận\\[1.5pt]\scriptsize cuối chuỗi\\[1.5pt]\scriptsize seq[:, $-1$, :$h$]\\[1.5pt]\scriptsize (B, $h$)};
+\node[blk=cStu,text width=3.7cm,minimum height=1.7cm] (ap) at (0,-6.0) {\textbf{attention pooling}\\[1.5pt]\scriptsize $\alpha_t=\mathrm{softmax}_t\big(w^\top\!\tanh(Ws_t)\big)$\\[1.5pt]\scriptsize $c=\sum_t\alpha_t s_t$ \;(B, $2h$)};
+\node[blk=cStu,text width=2.4cm,minimum height=1.7cm] (bw) at (3.9,-6.0) {hướng ngược\\[1.5pt]\scriptsize đầu chuỗi\\[1.5pt]\scriptsize seq[:, 0, $h$:]\\[1.5pt]\scriptsize (B, $h$)};
+\node[blk=cMoE,text width=4.6cm,minimum height=1.1cm] (e) at (0,-8.6) {\textbf{concat} $\to$ $e$ (B, $4h$)\\[1.5pt]\scriptsize thứ tự: thuận $\Vert$ ngược $\Vert$ $c$};
+\draw[flow] (hin) -- (mean); \draw[flow] (mean) -- (g);
+\draw[flow] (g.south) -- ++(0,-0.3) -| (fw.north);
+\draw[flow] (g.south) -- (ap.north);
+\draw[flow] (g.south) -- ++(0,-0.3) -| (bw.north);
+\draw[flow] (fw.south) |- (e.west); \draw[flow] (bw.south) |- (e.east); \draw[flow] (ap.south) -- (e.north);
+\coordinate (bTop) at (-5.6,1.3);
+\begin{scope}[on background layer]
+  \node[panel=cStu,fit=(hin)(e)(bTop)(fw)(bw)] (pb) {};
+\end{scope}
+\node[ptitle] at ($(pb.north west)+(0.15,-0.1)$) {(b) FreqPoolGRU};
+\end{tikzpicture}
+
+% ================= (c) Router + 4 Expert =================
+\begin{tikzpicture}
+\node[blk=cMoE,text width=3.0cm] (ein) at (0.2,0) {$e$ (B, $4h$)};
+\node[blk=cMoE,text width=2.7cm,minimum height=1.8cm] (rt) at (-1.8,-2.2) {\textbf{Router}\\[1.5pt]\scriptsize Linear $4h\to64$\\[1.5pt]\scriptsize GELU\\[1.5pt]\scriptsize Linear $64\to4$};
+\node[blk=cMoE,text width=3.5cm,minimum height=1.8cm] (ex) at (2.3,-2.2) {\textbf{4 Expert} \scriptsize(seed 0...3)\\[1.5pt]\scriptsize Linear $4h\to H$, GELU\\[1.5pt]\scriptsize Dropout 0,1\\[1.5pt]\scriptsize Linear $H\to36$};
+\node[blk=cMoE,text width=1.9cm,minimum height=0.7cm] (r) at (-1.8,-4.3) {$r$ (B, 4)};
+\node[blk=cMoE,text width=2.4cm,minimum height=0.7cm] (z) at (2.3,-4.3) {$z$ (B, 4, 36)};
+\node[blk=cMoE,text width=2.7cm,minimum height=0.9cm] (sm) at (-1.8,-5.7) {softmax\\[1.5pt]\scriptsize $w$ (B, 4)};
+\node[blk=cStu,text width=5.0cm,minimum height=1.0cm] (mx) at (0.2,-7.5) {$\mathrm{logits}=\sum_g w_g\,z_g$\\[1.5pt]\scriptsize (B, 36)};
+\draw[flow] (ein.south) -- ++(0,-0.35) -| (rt.north);
+\draw[flow] (ein.south) -- ++(0,-0.35) -| (ex.north);
+\draw[flow] (rt) -- (r); \draw[flow] (ex) -- (z); \draw[flow] (r) -- (sm);
+\draw[flow] (sm.south) -- (sm.south |- mx.north);
+\draw[flow] (z.south) -- (z.south |- mx.north);
+\node[font=\scriptsize,text=black!65,align=center,text width=3.9cm] at (-1.4,-9.2) {inference \texttt{weighted} (mặc định)\\hoặc \texttt{top1}: chỉ lấy $z_{\arg\max r}$};
+\node[loss,text width=2.9cm] (lkd) at (-6.3,-4.3) {$\mathcal L_{KD}$\\[1.5pt]\scriptsize $T^2\mathrm{KL}(p_t\Vert\mathrm{softmax}(r/T))$\\[1.5pt]\scriptsize $p_t$ từ teacher};
+\draw[kd] (r.west) -- (lkd.east);
+\node[loss,text width=2.9cm] (lce) at (2.2,-10.3) {$\mathcal L_{CE}$ · nhãn 36 lớp};
+\draw[trainonly] (mx.south -| lce.north) -- (lce.north);
+\coordinate (cTop) at (-7.9,1.3);
+\begin{scope}[on background layer]
+  \node[panel=cMoE,fit=(ein)(lce)(cTop)(lkd)(ex)] (pc) {};
+\end{scope}
+\node[ptitle] at ($(pc.north west)+(0.15,-0.1)$) {(c) Router + 4 Expert (soft-MoE)};
+\end{tikzpicture}
+
+\end{document}

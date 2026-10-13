@@ -1,0 +1,72 @@
+% Sơ đồ 2: student theo thứ tự chạy, kèm shape tensor, số tham số (cấu hình M) và nơi gắn các loss.
+\documentclass[tikz,border=8pt]{standalone}
+\input{kdmoe_common}
+\begin{document}
+\begin{tikzpicture}
+\def\W{6.2cm}
+
+% ---------- Cột chính ----------
+\node[blk=cStu,text width=\W,minimum height=0.8cm] (r0) at (0,0)     {\textbf{Waveform}\hfill\scriptsize 4 s · 16 kHz};
+\node[blk=cStu,text width=\W,minimum height=0.8cm] (r1) at (0,-1.5)  {\textbf{LogMel} + chuẩn hoá theo clip + crop 384 frame};
+\node[blk=cStu,text width=\W,minimum height=0.8cm] (r2) at (0,-3.0)  {\textbf{SpecAugment} \scriptsize(chỉ khi train)};
+\node[blk=cStu,text width=\W,minimum height=1.0cm] (r3) at (0,-4.6)  {\textbf{PatchEmbed}\\[-1pt]\scriptsize Conv $16{\times}16$, stride 16 + vị trí tần số + vị trí thời gian};
+\node[blk=cStu,text width=\W,minimum height=1.0cm] (r4) at (0,-6.4)  {\textbf{HybridBlock $\times2$}\\[-1pt]\scriptsize MHSA $\Vert$ BiGRU theo thời gian, rồi FFN};
+\node[blk=cStu,text width=\W,minimum height=1.0cm] (r5) at (0,-8.2)  {\textbf{MaskGate}\\[-1pt]\scriptsize $h\cdot g,\; g=\epsilon+(1-\epsilon)\,\sigma(Wh+b)$, $\epsilon=0{,}05$};
+\node[blk=cStu,text width=\W,minimum height=0.8cm] (r6) at (0,-10.0) {\textbf{ViTBlock $\times4$} \scriptsize(MHSA + FFN)};
+\node[blk=cStu,text width=\W,minimum height=0.8cm] (r7) at (0,-11.5) {\textbf{LayerNorm}};
+\node[blk=cStu,text width=\W,minimum height=1.0cm] (r8) at (0,-13.3) {\textbf{FreqPoolGRU}\\[-1pt]\scriptsize mean trên tần số $\to$ BiGRU $\to$ attention pooling, nối 3 phần};
+\node[blk=cMoE,text width=2.7cm,minimum height=1.0cm] (rt) at (-1.65,-15.5) {\textbf{Router}\\[-1pt]\scriptsize $4h\to64\to4$};
+\node[blk=cMoE,text width=2.7cm,minimum height=1.0cm] (ex) at (1.65,-15.5)  {\textbf{4 Expert}\\[-1pt]\scriptsize $4h\to H\to36$};
+\node[blk=cStu,text width=4.4cm,minimum height=1.0cm] (mx) at (0,-17.5) {\textbf{Trộn}\\[-1pt]\scriptsize $\sum_g \mathrm{softmax}(r)_g\,z_g$};
+
+\foreach \a/\b in {r0/r1,r1/r2,r2/r3,r3/r4,r4/r5,r5/r6,r6/r7,r7/r8} \draw[flow] (\a) -- (\b);
+\draw[flow] (r8.south) -- ++(0,-0.35) -| (rt.north);
+\draw[flow] (r8.south) -- ++(0,-0.35) -| (ex.north);
+\draw[flow] (rt.south) -- (rt.south |- mx.north);
+\draw[flow] (ex.south) -- (ex.south |- mx.north);
+
+% ---------- Cột shape và tham số (cấu hình M: d=256, h=128) ----------
+\node[font=\scriptsize\bfseries,anchor=west] at (3.7,0.95) {Shape ra (M: $d=256$, $h=128$)};
+\node[font=\scriptsize\bfseries,anchor=east] at (10.6,0.95) {Tham số (M)};
+\draw[black!35] (3.7,0.65) -- (10.6,0.65);
+\foreach \y/\s/\p in {
+  0/{(B, 64\,000)}/{—},
+  -1.5/{(B, 1, 128, 384)}/{—},
+  -3.0/{(B, 1, 128, 384)}/{—},
+  -4.6/{(B, 8, 24, 256)}/{73\,984},
+  -6.4/{(B, 8, 24, 256)}/{2\,172\,420},
+  -8.2/{(B, 8, 24, 256) và cổng $g$ cùng shape}/{65\,792},
+  -10.0/{(B, 8, 24, 256)}/{3\,159\,040},
+  -11.5/{(B, 8, 24, 256)}/{512},
+  -13.3/{(B,24,256) $\to$ (B,24,256) $\to$ $e$ (B, 512)}/{312\,960},
+  -15.5/{$r$ (B, 4) và $z$ (B, 4, 36)}/{33\,092 + 562\,320},
+  -17.5/{logits (B, 36)}/{—}%
+}{
+  \node[lbl] at (3.7,\y) {\s};
+  \node[lbl,anchor=east] at (10.6,\y) {\p};
+}
+\node[lbl,anchor=east,text=black] at (10.6,-18.7) {\textbf{Tổng 6\,445\,912} (suy luận 6\,380\,120, bỏ NoiseHead)};
+
+% ---------- Nhánh phụ NoiseHead (chỉ khi train) và các loss ----------
+\node[aux,text width=3.5cm,minimum height=0.9cm] (nz) at (-6.1,-1.5) {nhiễu thuần $n$\\[1pt]\scriptsize chỉ train/val, đích của $\mathcal L_{front}$};
+\draw[trainonly] (nz.east) -- (r1.west);
+\node[aux,text width=3.5cm,minimum height=1.15cm] (nh) at (-6.1,-8.2) {NoiseHead\\[-1pt]\scriptsize Linear $d\to256$, ghép patch\\[-1pt]\scriptsize (B,1,128,384) · 65\,792};
+\draw[trainonly] (r5.west) -- (nh.east);
+\node[loss,text width=3.5cm] (lfr) at (-6.1,-10.3) {$\mathcal L_{front}$ · L1 bất đối xứng\\[-1pt]\scriptsize đích: log-mel nhiễu thật};
+\draw[trainonly] (nh.south) -- (lfr.north);
+\node[loss,text width=3.5cm] (lco) at (-6.1,-13.3) {$\mathcal L_{cons}$ = $1-\cos(e_i,e_j)$\\[-1pt]\scriptsize cặp mixture cùng clip nhiễu};
+\draw[trainonly] (r8.west) -- node[above,font=\scriptsize]{$e$} (lco.east);
+\node[loss,text width=3.8cm] (lkd) at (-6.1,-15.5) {$\mathcal L_{KD}$\\[1pt]\scriptsize $T^2\,\mathrm{KL}(p_t\Vert\mathrm{softmax}(r/T))$};
+\draw[kd] (rt.west) -- node[above,font=\scriptsize]{$r$} (lkd.east);
+\node[blk=cTea,text width=3.8cm,minimum height=1.1cm] (pt) at (-6.1,-17.5) {$z_t$ (B,36) từ cache teacher\\[1pt]\scriptsize $p_t=\mathrm{softmax}(z_t/T)\,M$ (B,4)};
+\draw[kd] (pt.north) -- (lkd.south);
+\node[loss,text width=4.4cm] (lce) at (0,-19.6) {$\mathcal L_{CE}$ · label smoothing 0,1\\[-1pt]\scriptsize đích: nhãn 36 lớp};
+\draw[trainonly] (mx.south) -- (lce.north);
+
+% ---------- Vùng giai đoạn 1 ----------
+\begin{scope}[on background layer]
+  \node[panel=cStage,fit=(r3)(r4)(r5)(nh),inner sep=8pt,
+        label={[font=\scriptsize\itshape,text=black!70,anchor=south west,xshift=2pt]north west:Giai đoạn 1 chỉ học vùng này với $\mathcal L_{front}$ (36,9\% tham số)}] {};
+\end{scope}
+\end{tikzpicture}
+\end{document}

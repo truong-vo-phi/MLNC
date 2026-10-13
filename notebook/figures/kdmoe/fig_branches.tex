@@ -1,0 +1,80 @@
+% Sơ đồ chính: hai nhánh song song. Trái: teacher đóng băng (offline). Phải: student KD-MoE.
+% Giữa: p_t tính lúc train từ logit đã cache, KL chỉ vào router của student.
+\documentclass[tikz,border=8pt]{standalone}
+\input{kdmoe_common}
+\begin{document}
+\begin{tikzpicture}
+
+% ---------- Đầu vào dùng chung ----------
+\node[blk=cStu,text width=4.4cm,minimum height=1.1cm] (x) at (7.2,0) {\textbf{Mixture} $x$\\[1pt]\scriptsize (B, 64\,000) · 4 s · 16 kHz};
+
+% ---------- Nhánh teacher (trái) ----------
+\node[blk=cTea,text width=4.6cm,minimum height=1.25cm] (t1) at (0,-2.6)  {\textbf{FRCRN fine-tune}\\[1pt]\scriptsize ước lượng nhiễu $\hat n$ (hoặc $x-\hat n$)};
+\node[blk=cTea,text width=4.6cm,minimum height=1.25cm] (t2) at (0,-4.6)  {\textbf{Chuẩn hoá RMS}\\[1pt]\scriptsize về mức chuẩn $r$ của nhiễu thuần};
+\node[blk=cTea,text width=4.6cm,minimum height=1.25cm] (t3) at (0,-6.6)  {\textbf{BEATs fine-tune}\\[1pt]\scriptsize mean-pool $\to$ embedding 768-d};
+\node[blk=cTea,text width=4.6cm,minimum height=1.25cm] (t4) at (0,-8.6)  {\textbf{Linear probe 36 lớp}\\[1pt]\scriptsize train: logit out-of-fold (5 fold)\\[1pt]\scriptsize val/test: trung bình 5 probe};
+\node[blk=cTea,text width=4.6cm,minimum height=1.25cm] (t5) at (0,-10.6) {\textbf{logit teacher} $z_t$ (B, 36)\\[1pt]\scriptsize cache fp16 theo từng mixture};
+\foreach \a/\b in {t1/t2,t2/t3,t3/t4,t4/t5} \draw[flow] (\a) -- (\b);
+\coordinate (tpTop) at (-2.9,-0.9);
+\begin{scope}[on background layer]
+  \node[panel=cTea,fit=(t1)(t5)(tpTop),inner sep=10pt,
+        label={[ptitle,align=left]north west:Nhánh teacher\\[1pt]\textnormal{\footnotesize đóng băng, offline}}] (tpanel) {};
+\end{scope}
+
+% ---------- Nhánh student (phải) ----------
+\node[blk=cStu,text width=4.6cm,minimum height=1.25cm] (s1) at (14.4,-2.6) {\textbf{LogMel + SpecAugment}\\[1pt]\scriptsize PatchEmbed $\to$ (B, 8, 24, $d$)};
+\node[blk=cStu,text width=4.6cm,minimum height=1.25cm] (s2) at (14.4,-4.6) {\textbf{HybridBlock $\times2$} + MaskGate\\[1pt]\scriptsize MHSA $\Vert$ BiGRU, cổng $g\in[0{,}05;1]$};
+\node[blk=cStu,text width=4.6cm,minimum height=1.25cm] (s3) at (14.4,-6.6) {\textbf{ViTBlock $\times n_{vit}$} + LayerNorm\\[1pt]\scriptsize (B, 8, 24, $d$)};
+\node[blk=cStu,text width=4.6cm,minimum height=1.25cm] (s4) at (14.4,-8.6) {\textbf{FreqPoolGRU}\\[1pt]\scriptsize embedding $e$ (B, $4h$)};
+\node[blk=cMoE,text width=2.7cm,minimum height=1.45cm] (rt) at (12.2,-10.9) {\textbf{Router}\\[1pt]\scriptsize $r$ (B, 4)\\[1pt]\scriptsize chỉ tạo trọng số};
+\node[blk=cMoE,text width=2.7cm,minimum height=1.45cm] (ex) at (16.6,-10.9) {\textbf{4 Expert}\\[1pt]\scriptsize $z_g$ (B, 4, 36)\\[1pt]\scriptsize luôn chạy cả 4};
+\node[blk=cStu,text width=5.0cm,minimum height=1.25cm] (mx) at (14.4,-13.1) {\textbf{Trộn có trọng số}\\[1pt]\scriptsize $\sum_g \mathrm{softmax}(r)_g\,z_g\to$ logits (B, 36)};
+\foreach \a/\b in {s1/s2,s2/s3,s3/s4} \draw[flow] (\a) -- (\b);
+\draw[flow] (s4.south) -- ++(0,-0.4) -| (rt.north);
+\draw[flow] (s4.south) -- ++(0,-0.4) -| (ex.north);
+\draw[flow] (rt.south) -- (rt.south |- mx.north);
+\draw[flow] (ex.south) -- (ex.south |- mx.north);
+
+\node[aux,text width=2.7cm,minimum height=1.0cm] (nz) at (19.0,-2.6) {nhiễu thuần $n$\\[1pt]\scriptsize chỉ train/val};
+\draw[trainonly] (nz.west) -- (s1.east);
+\node[aux,text width=2.7cm,minimum height=1.0cm] (nh) at (19.0,-4.6) {NoiseHead\\[1pt]\scriptsize log-mel nhiễu};
+\draw[trainonly] (s2.east) -- (nh.west);
+
+\coordinate (spTop) at (11.5,-0.9);
+\begin{scope}[on background layer]
+  \node[panel=cStu,fit=(s1)(s2)(s3)(s4)(rt)(ex)(mx)(nh)(nz)(spTop),inner sep=10pt,
+        label={[ptitle,anchor=north east,align=right]north east:Nhánh student KD-MoE\\[1pt]\textnormal{\footnotesize duy nhất chạy khi suy luận}}] (spanel) {};
+\end{scope}
+
+% ---------- Đầu vào vào hai nhánh ----------
+\draw[flow] (x.west) -| (t1.north);
+\draw[flow] (x.east) -| (s1.north);
+
+% ---------- Chưng cất: p_t tính lúc train, KL chỉ vào router ----------
+\node[loss,text width=3.9cm,minimum height=1.1cm] (pt) at (7.2,-10.6) {$p_t=\mathrm{softmax}(z_t/T)\,M$\\[1pt]\scriptsize tính lúc train, (B, 4)};
+\draw[trainonly] (t5.east) -- (pt.west);
+\node[loss,text width=3.9cm,minimum height=1.1cm] (lkd) at (7.2,-13.1) {$\mathcal L_{KD}$\\[1pt]\scriptsize $T^2\,\mathrm{KL}(p_t\,\Vert\,\mathrm{softmax}(r/T))$};
+\draw[kd] (pt.south) -- (lkd.north);
+\draw[kd] (rt.west) -- ++(-0.45,0) |- (lkd.east);
+\node[font=\scriptsize\itshape,text=cLoss!70!black,align=center,text width=3.9cm] at (7.2,-14.6) {teacher chỉ dạy router (mức nhóm),\\không dạy expert};
+
+% ---------- Các loss còn lại ----------
+\node[loss,text width=3.3cm] (lfr) at (23.0,-4.6) {$\mathcal L_{front}$ · L1 bất đối xứng\\[1pt]\scriptsize đích: log-mel nhiễu thật};
+\draw[trainonly] (nh.east) -- (lfr.west);
+\node[loss,text width=3.3cm] (lco) at (23.0,-8.6) {$\mathcal L_{cons}$ = $1-\cos$\\[1pt]\scriptsize cặp cùng clip nhiễu\\[1pt]\scriptsize (PairedClipSampler)};
+\draw[trainonly] (s4.east) -- (lco.west);
+\node[loss,text width=4.6cm] (lce) at (14.4,-15.2) {$\mathcal L_{CE}$ · label smoothing 0,1\\[1pt]\scriptsize đích: nhãn 36 lớp};
+\draw[trainonly] (mx.south) -- (lce.north);
+
+% ---------- Chú giải ----------
+\begin{scope}[shift={(-2.5,-17.1)}]
+  \draw[flow] (0,0) -- (1.0,0); \node[lbl] at (1.1,0) {luồng suy luận};
+  \draw[trainonly] (4.4,0) -- (5.4,0); \node[lbl] at (5.5,0) {chỉ khi huấn luyện};
+  \draw[kd] (9.6,0) -- (10.6,0); \node[lbl] at (10.7,0) {chưng cất teacher $\to$ router};
+  \node[draw=cTea!80!black,fill=cTea!12,minimum size=0.3cm,inner sep=0] at (16.6,0) {}; \node[lbl] at (16.8,0) {teacher};
+  \node[draw=cStu!80!black,fill=cStu!12,minimum size=0.3cm,inner sep=0] at (19.0,0) {}; \node[lbl] at (19.2,0) {student};
+  \node[draw=cMoE!80!black,fill=cMoE!12,minimum size=0.3cm,inner sep=0] at (21.3,0) {}; \node[lbl] at (21.5,0) {router, expert};
+  \node[draw=cLoss!85!black,fill=cLoss!14,minimum size=0.3cm,inner sep=0] at (24.2,0) {}; \node[lbl] at (24.4,0) {loss};
+\end{scope}
+\end{tikzpicture}
+\end{document}
