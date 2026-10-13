@@ -9,6 +9,7 @@ venv/
 .vscode/
 .idea/
 .ipynb_checkpoints/
+notebook/__marimo__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/

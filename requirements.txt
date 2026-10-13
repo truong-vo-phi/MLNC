@@ -5,7 +5,6 @@ torch>=2.2
 torchaudio>=2.2
 soundfile>=0.12
 pyyaml>=6.0
-safetensors>=0.4
 requests>=2.31
 gdrive-fsspec
 tqdm>=4.66
