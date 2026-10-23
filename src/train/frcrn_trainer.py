@@ -6,7 +6,7 @@ import os
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any
 
 import torch
 from torch import Tensor, nn
@@ -15,15 +15,16 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
 from src.loss.frcrn import si_snr
+from src.metrics import SnrBucketMeter
 from src.model.frcrn import FRCRNSeparator
 from src.utils.batch_size import largest_fitting_batch
 
-from .base import StepOutput, Trainer
+from .base import StepOutput, Trainer, TrainingResult
 from .config import FRCRNTrainConfig
 
 
 class FRCRNTrainer(Trainer):
-    selection_metric: ClassVar[str] = "noise_si_snr"
+    selection_metric: str = "noise_si_snr"
 
     def __init__(
         self,
@@ -36,10 +37,17 @@ class FRCRNTrainer(Trainer):
         on_checkpoint: Callable[[Path, int, float], None] | None = None,
         resume_path: str | Path | None = None,
         drive_backup: Callable[[str | Path], None] | None = None,
+        epoch_callback: Callable[[int, dict[str, float]], None] | None = None,
     ) -> None:
         super().__init__(model, config, device, logger, name, checkpoint_path, on_checkpoint)
+        self.selection_metric = config.selection_metric
         self.resume_path = Path(resume_path) if resume_path else None
         self.drive_backup = drive_backup
+        self.epoch_callback = epoch_callback
+        self._last_scores: dict[str, float] = {}
+        self._last_train: dict[str, float] = {}
+        self._epoch_records: list[dict[str, float]] = []
+        self._past_history: list[dict[str, float]] = []
         self._completed_epochs = 0
         self._current_epoch = 0
         self._resume_state: dict[str, Any] | None = None
@@ -67,6 +75,7 @@ class FRCRNTrainer(Trainer):
             "best_score": self._best_score,
             "best_epoch": self._best_epoch,
             "best_state": copy.deepcopy(self._best_state) if self._best_state is not None else None,
+            "epoch_records": list(self._epoch_records),
         }
         partial = path.with_name(path.name + ".part")
         torch.save(payload, partial)
@@ -81,8 +90,14 @@ class FRCRNTrainer(Trainer):
         self._best_epoch = int(data.get("best_epoch", 0))
         self._resumed_best_state = data.get("best_state")
         self._resume_state = data
+        self._past_history = list(data.get("epoch_records", []))
+        self._epoch_records = list(self._past_history)
         self.logger.info(
-            "resume: %s từ epoch %d (best %.4f @ %d)", self.name, self._completed_epochs, self._best_score, self._best_epoch
+            "resume: %s từ epoch %d (best %.4f @ %d)",
+            self.name,
+            self._completed_epochs,
+            self._best_score,
+            self._best_epoch,
         )
 
     def snapshot(self) -> dict[str, Tensor]:
@@ -91,11 +106,23 @@ class FRCRNTrainer(Trainer):
             return state
         return super().snapshot()
 
+    def skip_epoch(self, epoch: int) -> bool:
+        return epoch <= self._completed_epochs
+
+    def fit(self, train_loader: DataLoader, val_loader: DataLoader) -> TrainingResult:
+        result = super().fit(train_loader, val_loader)
+        result.history = self._past_history + result.history
+        return result
+
     def run_epoch(self, loader: DataLoader, epoch: int) -> dict[str, float]:
         if epoch <= self._completed_epochs:
             return {}
         self._current_epoch = epoch
-        return super().run_epoch(loader, epoch)
+        if self.config.lr_decay != 1.0 and epoch > 1:
+            for group in self.optimizer.param_groups:
+                group["lr"] *= self.config.lr_decay
+        self._last_train = super().run_epoch(loader, epoch)
+        return self._last_train
 
     def training_step(self, batch: dict[str, Any]) -> StepOutput:
         mixture, noise = batch["waveform"].to(self.device), batch["noise"].to(self.device)
@@ -104,16 +131,31 @@ class FRCRNTrainer(Trainer):
     @torch.no_grad()
     def evaluate(self, loader: DataLoader, desc: str = "evaluate") -> dict[str, float]:
         self.model.eval()
-        total_loss, total_si_snr, count = 0.0, 0.0, 0
+        total_loss, count = 0.0, 0
+        noise_meter = SnrBucketMeter(self.config.high_snr_levels)
+        speech = SnrBucketMeter(self.config.high_snr_levels)
         for batch in tqdm(loader, desc=desc, unit="batch", leave=False, dynamic_ncols=True):
             mixture, noise = batch["waveform"].to(self.device), batch["noise"].to(self.device)
             size = len(mixture)
+            estimate = self.model(mixture)
             total_loss += self.model.loss(mixture, noise).item() * size
-            total_si_snr += si_snr(noise, self.model(mixture)).sum().item()
+            noise_meter.update(si_snr(noise, estimate), batch["snr_db"])
+            speech.update(si_snr(mixture - noise, mixture - estimate), batch["snr_db"])
             count += size
-        return {"loss": total_loss / count, "noise_si_snr": total_si_snr / count}
+        scores = {
+            "loss": total_loss / count,
+            **noise_meter.compute("noise_si_snr"),
+            **speech.compute("speech_si_snr"),
+        }
+        self._last_scores = scores
+        return scores
 
     def end_epoch(self, epoch: int) -> None:
+        self._epoch_records.append(
+            {"epoch": epoch, **self._last_train, **{f"val_{k}": v for k, v in self._last_scores.items()}}
+        )
+        if self.epoch_callback is not None and self._last_scores:
+            self.epoch_callback(epoch, {**self._last_scores, **self._last_train, "lr": self.lr})
         if self.resume_path is None:
             return
         self.save_resume(self.resume_path)
@@ -125,12 +167,14 @@ class FRCRNTrainer(Trainer):
             return None
         scores = self.evaluate(loader, desc=f"{self.name} - baseline")
         self.logger.info(
-            "%s baseline (pretrained) val loss %.3f | noise si-snr %.2f dB",
+            "%s baseline (pretrained) val loss %.3f | noise si-snr %.2f dB | %s %.2f dB",
             self.name,
             scores["loss"],
             scores["noise_si_snr"],
+            self.selection_metric,
+            scores[self.selection_metric],
         )
-        return scores["noise_si_snr"]
+        return scores[self.selection_metric]
 
     def on_no_improvement(self, epoch: int, stale: int) -> None:
         if stale != self.config.halve_lr_after:

@@ -73,6 +73,7 @@ class Trainer(ABC):
         self._best_score = -float("inf")
         self._best_epoch = 0
         self._best_state: dict[str, Tensor] | None = None
+        self._stale = 0
 
     @property
     def checkpoint_module(self) -> nn.Module:
@@ -112,6 +113,13 @@ class Trainer(ABC):
 
     def end_epoch(self, epoch: int) -> None:
         pass
+
+    def skip_epoch(self, epoch: int) -> bool:
+        return False
+
+    def initial_stale(self) -> int:
+        """Số epoch liên tiếp chưa cải thiện lúc bắt đầu `fit` (khác 0 khi resume)."""
+        return 0
 
     def snapshot(self) -> dict[str, Tensor]:
         return copy.deepcopy(self.checkpoint_module.state_dict())
@@ -165,8 +173,10 @@ class Trainer(ABC):
             self._record_best(baseline, epoch=0)
 
         history: list[dict[str, float]] = []
-        stale, epoch = 0, 0
+        stale, epoch = self.initial_stale(), 0
         for epoch in range(1, self.config.epochs + 1):
+            if self.skip_epoch(epoch):
+                continue
             train_stats = self.run_epoch(train_loader, epoch)
             scores = self.evaluate(val_loader, desc=f"{self.name} - validation")
             history.append({"epoch": epoch, **train_stats, **{f"val_{k}": v for k, v in scores.items()}})
@@ -176,6 +186,7 @@ class Trainer(ABC):
                 stale = 0
             else:
                 stale += 1
+            self._stale = stale
             self.logger.info(
                 f"[{self.name}] epoch {epoch}/{self.config.epochs}"
                 f" | train {self._format(train_stats)} | val {self._format(scores)}"

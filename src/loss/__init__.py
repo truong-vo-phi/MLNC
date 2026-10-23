@@ -11,6 +11,7 @@ from .kdmoe import (
     router_kl,
     teacher_group_probs,
 )
+from .reviewkd import HierarchicalContextLoss
 
 __all__ = [
     "ConsistencyLoss",
@@ -18,6 +19,7 @@ __all__ = [
     "DistillationLoss",
     "FRCRNLoss",
     "FrontLoss",
+    "HierarchicalContextLoss",
     "KDMoELoss",
     "KDMoELossConfig",
     "Loss",

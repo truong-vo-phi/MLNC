@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar, NamedTuple
@@ -43,6 +44,7 @@ class BEATConfig(BaseConfig):
 class BEATOutput(NamedTuple):
     logits: Tensor
     features: Tensor
+    hidden: tuple[Tensor, ...] = ()
 
 
 class BEATClassifier(BaseModel):
@@ -61,10 +63,10 @@ class BEATClassifier(BaseModel):
             raw = yaml.safe_load(f)
         return cls(BEATConfig.from_dict(raw[BEATConfig.section]), raw.get("frontend"))
 
-    def forward(self, x: Tensor, is_waveform: bool = True) -> BEATOutput:
+    def forward(self, x: Tensor, is_waveform: bool = True, layers: Sequence[int] = ()) -> BEATOutput:
         fbank = self.frontend(x) if is_waveform else x
-        features = self.backbone(fbank)
-        return BEATOutput(logits=self.head(features), features=features)
+        features, hidden = self.backbone.forward_with_hidden(fbank, layers)
+        return BEATOutput(logits=self.head(features), features=features, hidden=hidden)
 
     def convert_checkpoint(self, checkpoint: dict[str, Any]) -> dict[str, Tensor]:
         state = {}

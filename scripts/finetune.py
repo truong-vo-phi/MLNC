@@ -59,6 +59,7 @@ def prepare_stage(
     logger: logging.Logger,
     fs: Any = None,
     drive_dir: str = DRIVE_FINETUNE_DIR,
+    keep_history: bool = False,
 ) -> StageFiles:
     """Create the stage files; with fs, pull missing ones from Drive (to resume) and mirror new ones."""
     local_dir = Path(local_dir) / name
@@ -78,7 +79,7 @@ def prepare_stage(
         except Exception as error:
             logger.warning("drive: cannot restore %s: %r", path.name, error)
 
-    files.on_checkpoint = DriveCheckpointUploader(fs, remote_dir, logger)
+    files.on_checkpoint = DriveCheckpointUploader(fs, remote_dir, logger, keep_history)
     files.drive_backup = DriveFileBackup(fs, remote_dir, files.resume.name, logger)
     files.result_backup = DriveFileBackup(fs, remote_dir, files.result.name, logger)
     return files
@@ -128,11 +129,15 @@ def finetune_frcrn(
     max_samples: int | None = None,
     num_workers: int = 4,
     smoke: bool = False,
+    on_epoch: Callable[[int, dict[str, float]], None] | None = None,
+    make_loaders: Callable[[FRCRNTrainConfig, int | None, int], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Fine-tune FRCRN on Mixture-36l noise targets, resuming from files.resume; leaves it frozen on device.
 
     A finished stage (files.result exists) only reloads files.best.
     smoke=True: 1 epoch on SMOKE_SAMPLES clips per split, no workers (use a separate stage dir).
+    make_loaders(config, max_samples, num_workers): train/validation loaders replacing Mixture-36l's own noise
+    (e.g. the AudioSet noise reference); it receives the config and limits after the smoke adjustment.
     """
     config = config or FRCRNTrainConfig.from_yaml(FRCRN_CONFIG)
     if smoke:
@@ -144,23 +149,37 @@ def finetune_frcrn(
         logger.info("frcrn: finished earlier, loaded %s", files.best)
         return json.loads(files.result.read_text(encoding="utf-8"))
 
-    loaders = mixture_loaders(
-        config.batch_size,
-        config.eval_batch_size,
-        train_seconds=config.segment_seconds,
-        eval_seconds=config.eval_segment_seconds,
-        load_noise=True,
-        max_samples=max_samples,
-        num_workers=num_workers,
-    )
+    if make_loaders is None:
+        loaders = mixture_loaders(
+            config.batch_size,
+            config.eval_batch_size,
+            train_seconds=config.segment_seconds,
+            eval_seconds=config.eval_segment_seconds,
+            load_noise=True,
+            max_samples=max_samples,
+            num_workers=num_workers,
+        )
+    else:
+        loaders = make_loaders(config, max_samples, num_workers)
     set_trainable(separator, True)
     trainer = FRCRNTrainer(
-        separator, config, device, logger, "frcrn", files.best, files.on_checkpoint, files.resume, files.drive_backup
+        separator,
+        config,
+        device,
+        logger,
+        "frcrn",
+        files.best,
+        files.on_checkpoint,
+        files.resume,
+        files.drive_backup,
+        epoch_callback=on_epoch,
     )
     if files.resume.is_file():
         trainer.load_resume(files.resume)
     fit = trainer.fit(loaders["train"], loaders["validation"])
-    logger.info("frcrn: best noise si-snr %.2f dB @ epoch %d / %d", fit.best_score, fit.best_epoch, fit.epochs_run)
+    logger.info(
+        "frcrn: best %s %.2f dB @ epoch %d / %d", fit.selection_metric, fit.best_score, fit.best_epoch, fit.epochs_run
+    )
 
     result = fit.to_dict()
     save_result(files, result)

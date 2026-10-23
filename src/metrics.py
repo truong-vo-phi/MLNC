@@ -216,3 +216,39 @@ class ClassificationMetrics:
             mAP=_safe_mean([v for v in ap_values if not np.isnan(v)]),
             macro_auc=_safe_mean([v for v in auc_values if not np.isnan(v)]),
         )
+
+
+class SnrBucketMeter:
+    def __init__(self, high_levels: Sequence[float] = (15.0, 20.0)) -> None:
+        self.high_levels = tuple(float(level) for level in high_levels)
+        self.reset()
+
+    def reset(self) -> None:
+        self._sums: dict[float, float] = {}
+        self._counts: dict[float, int] = {}
+
+    def update(self, values: Any, snr_db: Any) -> SnrBucketMeter:
+        scores = _to_numpy(values).astype(np.float64).reshape(-1)
+        levels = _to_numpy(snr_db).astype(np.float64).reshape(-1)
+        if scores.shape != levels.shape:
+            raise ValueError(f"values {scores.shape} and snr_db {levels.shape} must match")
+        for level in np.unique(levels):
+            selected = scores[levels == level]
+            key = float(level)
+            self._sums[key] = self._sums.get(key, 0.0) + float(selected.sum())
+            self._counts[key] = self._counts.get(key, 0) + int(selected.size)
+        return self
+
+    def means(self) -> dict[float, float]:
+        return {level: self._sums[level] / self._counts[level] for level in sorted(self._sums)}
+
+    def compute(self, prefix: str) -> dict[str, float]:
+        if not self._counts:
+            raise ValueError("no samples recorded, call update() first")
+        means = self.means()
+        result = {prefix: sum(self._sums.values()) / sum(self._counts.values())}
+        result.update({f"{prefix}_{level:g}": mean for level, mean in means.items()})
+        high = [means[level] for level in self.high_levels if level in means]
+        if high:
+            result[f"{prefix}_hi"] = sum(high) / len(high)
+        return result

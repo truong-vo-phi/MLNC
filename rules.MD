@@ -28,6 +28,8 @@ Mục tiêu cao nhất: **nhất quán**. Khi có hai cách làm, chọn cách r
 | Trọng số pretrain tải về | `pretrained/` (không đưa lên git) |
 | Dataset tải về từ Kaggle | `datasets/` (không đưa lên git) |
 | Đầu ra khi chạy | `output/` (xem mục 5) |
+| Nhật ký thay đổi (thêm, sửa, xoá) | `.log/p1.md`, định dạng theo `.log/log-guide.md` |
+| File bỏ đi, chờ xoá hẳn (thùng rác tạm) | `.bin/`, giữ nguyên đường dẫn tương đối; không xoá thẳng |
 
 - Mỗi thư mục chứa mã Python phải có `__init__.py`.
 - Không để dữ liệu, trọng số, log trong `src/`, `scripts/`, `config/`.
@@ -130,3 +132,4 @@ output/figure/<experiment>-<YYYY-MM-DD-HH-MM-SS>/*.png
 - [ ] Đầu ra qua `RunPaths`.
 - [ ] Có test; `ruff` và `pytest -m "not data"` đều qua.
 - [ ] README hoặc `rules.MD` được cập nhật nếu thêm folder hoặc quy ước mới.
+- [ ] Mọi thao tác thêm, sửa, xoá trong ngày đã ghi vào `.log/p1.md` theo `.log/log-guide.md`.

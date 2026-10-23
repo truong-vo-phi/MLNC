@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import torch
 from torch import nn
 
@@ -19,6 +21,11 @@ class BEATsBackbone(nn.Module):
         self.encoder = TransformerEncoder(config)
 
     def forward(self, fbank: torch.Tensor) -> torch.Tensor:
+        return self.forward_with_hidden(fbank)[0]
+
+    def forward_with_hidden(
+        self, fbank: torch.Tensor, layers: Sequence[int] = ()
+    ) -> tuple[torch.Tensor, tuple[torch.Tensor, ...]]:
         x = self.patch_embed(fbank)
         x = self.post_extract_proj(self.layer_norm(x))
-        return self.encoder(self.dropout_input(x))
+        return self.encoder.forward_with_hidden(self.dropout_input(x), layers)

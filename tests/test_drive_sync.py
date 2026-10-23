@@ -112,3 +112,23 @@ def test_drive_file_backup_swallows_errors(tmp_path, caplog):
     with caplog.at_level(logging.WARNING, logger="drive-test"):
         backup(tmp_path / "resume.pt")
     assert "drive backup failed" in caplog.text
+
+
+def test_uploader_keep_history_adds_timestamped_copy(tmp_path):
+    from scripts.drive_sync import utc_stamp
+
+    drive = FakeDrive()
+    uploader = DriveCheckpointUploader(drive, "a/b", keep_history=True)
+    checkpoint = tmp_path / "last_best_checkpoint.pt"
+    uploader(checkpoint, 7, -3.2)
+    assert len(drive.puts) == 2
+    assert drive.puts[0] == (str(checkpoint), "a/b/best.pt")
+    history = drive.puts[1][1]
+    assert history.startswith("a/b/best_e007_") and history.endswith("Z.pt")
+    assert len(history) == len("a/b/best_e007_") + len(utc_stamp()) + len(".pt")
+
+
+def test_uploader_without_history_keeps_single_upload(tmp_path):
+    drive = FakeDrive()
+    DriveCheckpointUploader(drive, "a/b")(tmp_path / "c.pt", 1, 0.0)
+    assert len(drive.puts) == 1

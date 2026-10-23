@@ -26,6 +26,8 @@ PRETRAINED_DIR = ROOT / "pretrained"
 # FRCRN/best.pt trên Drive (beat_v1); tách khỏi frcrn_best.pt (bản VLSP dùng cho beat-v2)
 FRCRN_BEST_PATH = PRETRAINED_DIR / "frcrn_beat_v1_best.pt"
 
+DOWNLOAD_RETRIES = 6
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,16 +60,27 @@ def download_checkpoint(url: str, out_dir: Path = PRETRAINED_DIR) -> Path:
         return destination
 
     partial = destination.with_suffix(destination.suffix + ".part")
-    with requests.get(url, stream=True, timeout=60) as response:
-        response.raise_for_status()
-        total = int(response.headers.get("content-length", 0))
-        with (
-            open(partial, "wb") as f,
-            tqdm(total=total, unit="B", unit_scale=True, desc=destination.name) as progress,
-        ):
-            for chunk in response.iter_content(1 << 20):
-                f.write(chunk)
-                progress.update(len(chunk))
+    for attempt in range(1, DOWNLOAD_RETRIES + 1):
+        # tiếp tục từ phần đã tải (Range) khi mạng đứt giữa chừng; máy chủ không hỗ trợ Range thì tải lại từ đầu
+        start = partial.stat().st_size if partial.exists() else 0
+        try:
+            with requests.get(url, stream=True, timeout=60, headers={"Range": f"bytes={start}-"} if start else {}) as response:
+                response.raise_for_status()
+                resumed = start > 0 and response.status_code == 206
+                start = start if resumed else 0
+                total = start + int(response.headers.get("content-length", 0))
+                with (
+                    open(partial, "ab" if resumed else "wb") as f,
+                    tqdm(total=total, initial=start, unit="B", unit_scale=True, desc=destination.name) as progress,
+                ):
+                    for chunk in response.iter_content(1 << 20):
+                        f.write(chunk)
+                        progress.update(len(chunk))
+            break
+        except requests.RequestException as error:
+            if attempt == DOWNLOAD_RETRIES:
+                raise
+            logger.warning("download %s interrupted (attempt %d/%d): %r", destination.name, attempt, DOWNLOAD_RETRIES, error)
     partial.rename(destination)
     return destination
 

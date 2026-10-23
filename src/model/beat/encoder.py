@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 
 import torch
 from torch import nn
@@ -58,9 +59,20 @@ class TransformerEncoder(nn.Module):
         self.dropout = nn.Dropout(config.dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.forward_with_hidden(x)[0]
+
+    def forward_with_hidden(
+        self, x: torch.Tensor, layers: Sequence[int] = ()
+    ) -> tuple[torch.Tensor, tuple[torch.Tensor, ...]]:
+        invalid = [index for index in layers if not 1 <= index <= len(self.layers)]
+        if invalid:
+            raise ValueError(f"layers {invalid} are outside 1..{len(self.layers)}")
         x = x + self.pos_conv(x.transpose(1, 2)).transpose(1, 2)
         x = self.dropout(self.layer_norm(x))
         position_bias = None
-        for layer in self.layers:
+        hidden: dict[int, torch.Tensor] = {}
+        for index, layer in enumerate(self.layers, start=1):
             x, position_bias = layer(x, position_bias)
-        return x
+            if index in layers:
+                hidden[index] = x
+        return x, tuple(hidden[index] for index in layers)

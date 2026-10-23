@@ -52,17 +52,29 @@ def complex_ideal_ratio_mask(
 class FRCRNLoss(SeparationLoss):
     name = "frcrn"
 
-    def __init__(self, config: FRCRNConfig, mask_bound: float = 2.0, eps: float = 1e-6, mask_eps: float = 1e-8) -> None:
+    def __init__(
+        self,
+        config: FRCRNConfig,
+        mask_bound: float = 2.0,
+        eps: float = 1e-6,
+        mask_eps: float = 1e-8,
+        mask_weight: float = 1.0,
+    ) -> None:
         super().__init__()
+        if mask_weight < 0:
+            raise ValueError(f"mask_weight must be non-negative, got {mask_weight}")
         self.config = config
         self.mask_bound = mask_bound
         self.eps = eps
         self.mask_eps = mask_eps
+        self.mask_weight = mask_weight
 
     def forward(self, mixture: Tensor, target: Tensor, estimate: Tensor, mask: Tensor) -> Tensor:
         ideal = complex_ideal_ratio_mask(target, mixture, self.config, self.mask_bound, self.mask_eps)
         bins = self.config.num_bins
         mask_loss = (
-            F.mse_loss(mask[:, :bins], ideal[:, :bins]) + F.mse_loss(mask[:, bins:], ideal[:, bins:])
-        ) * self.config.fft_len
+            (F.mse_loss(mask[:, :bins], ideal[:, :bins]) + F.mse_loss(mask[:, bins:], ideal[:, bins:]))
+            * self.config.fft_len
+            * self.mask_weight
+        )
         return mask_loss - si_snr(target, estimate, self.eps).mean()

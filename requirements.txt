@@ -11,3 +11,8 @@ tqdm>=4.66
 matplotlib>=3.8
 jupyter
 ipykernel
+timm>=1.0
+torchvision>=0.17
+wandb>=0.17
+pesq>=0.0.4
+pystoi>=0.4
