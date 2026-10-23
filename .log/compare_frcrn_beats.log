@@ -1,0 +1,20 @@
+2026-10-20 07:45:22,397 | INFO | train clips 216, test clips 432
+C:\Users\phitr\AppData\Roaming\Python\Python314\site-packages\torch\nn\utils\weight_norm.py:145: FutureWarning: `torch.nn.utils.weight_norm` is deprecated in favor of `torch.nn.utils.parametrizations.weight_norm`.
+  WeightNorm.apply(module, name, dim)
+2026-10-20 07:48:36,760 | INFO | best: target=speech, noise SI-SNR theo target {'speech': 5.093761610488097, 'noise': -21.711239476998646}
+2026-10-20 07:51:42,667 | INFO | best_v2: target=noise, noise SI-SNR theo target {'speech': -21.657401422659557, 'noise': 4.813663444792231}
+2026-10-20 07:52:23,182 | INFO | mixture_only (không FRCRN) train done in 40s
+2026-10-20 07:53:48,494 | INFO | mixture_only (không FRCRN) test done in 85s
+D:\PROJECT\MLNC\src\metrics.py:194: RuntimeWarning: invalid value encountered in divide
+  2 * present_precision * present_recall / (present_precision + present_recall),
+2026-10-20 07:53:48,560 | INFO | mixture_only (không FRCRN) -> {'top1_accuracy': 0.2824, 'top3_accuracy': 0.4792, 'balanced_accuracy': 0.2824, 'precision_macro': 0.3467, 'recall_macro': 0.2824, 'macro_f1': 0.2942, 'micro_f1': 0.2824, 'mAP': 0.178, 'macro_auc': 0.7314, 'acc_snr_-5': 0.3472, 'acc_snr_0': 0.3472, 'acc_snr_5': 0.2917, 'acc_snr_10': 0.25, 'acc_snr_15': 0.2639, 'acc_snr_20': 0.1944}
+2026-10-20 07:54:30,084 | INFO | noise_oracle (nhi\u1ec5u s\u1ea1ch) train done in 42s
+2026-10-20 07:55:57,672 | INFO | noise_oracle (nhi\u1ec5u s\u1ea1ch) test done in 88s
+2026-10-20 07:55:57,716 | INFO | noise_oracle (nhi\u1ec5u s\u1ea1ch) -> {'top1_accuracy': 0.4722, 'top3_accuracy': 0.7245, 'balanced_accuracy': 0.4722, 'precision_macro': 0.528, 'recall_macro': 0.4722, 'macro_f1': 0.4678, 'micro_f1': 0.4722, 'mAP': 0.4065, 'macro_auc': 0.8366, 'acc_snr_-5': 0.4861, 'acc_snr_0': 0.5, 'acc_snr_5': 0.4167, 'acc_snr_10': 0.4861, 'acc_snr_15': 0.5139, 'acc_snr_20': 0.4306}
+2026-10-20 08:10:59,686 | INFO | frcrn_best (target=speech) train done in 902s
+2026-10-20 08:41:18,679 | INFO | frcrn_best (target=speech) test done in 1819s
+2026-10-20 08:41:18,731 | INFO | frcrn_best (target=speech) -> {'top1_accuracy': 0.4074, 'top3_accuracy': 0.6204, 'balanced_accuracy': 0.4074, 'precision_macro': 0.4823, 'recall_macro': 0.4074, 'macro_f1': 0.4132, 'micro_f1': 0.4074, 'mAP': 0.2641, 'macro_auc': 0.7876, 'acc_snr_-5': 0.4444, 'acc_snr_0': 0.4583, 'acc_snr_5': 0.3611, 'acc_snr_10': 0.4028, 'acc_snr_15': 0.4167, 'acc_snr_20': 0.3611, 'noise_sisnr_db': 7.4344, 'sisnr_snr_-5': 13.7684, 'sisnr_snr_0': 10.6637, 'sisnr_snr_5': 9.0761, 'sisnr_snr_10': 6.7832, 'sisnr_snr_15': 3.4563, 'sisnr_snr_20': 0.859}
+2026-10-20 08:57:03,594 | INFO | frcrn_best_v2 (target=noise) train done in 945s
+2026-10-20 09:27:59,278 | INFO | frcrn_best_v2 (target=noise) test done in 1856s
+2026-10-20 09:27:59,493 | INFO | frcrn_best_v2 (target=noise) -> {'top1_accuracy': 0.4005, 'top3_accuracy': 0.5972, 'balanced_accuracy': 0.4005, 'precision_macro': 0.4801, 'recall_macro': 0.4005, 'macro_f1': 0.4052, 'micro_f1': 0.4005, 'mAP': 0.2662, 'macro_auc': 0.7888, 'acc_snr_-5': 0.4444, 'acc_snr_0': 0.4861, 'acc_snr_5': 0.3472, 'acc_snr_10': 0.4167, 'acc_snr_15': 0.3472, 'acc_snr_20': 0.3611, 'noise_sisnr_db': 6.3475, 'sisnr_snr_-5': 11.1463, 'sisnr_snr_0': 9.5222, 'sisnr_snr_5': 8.0615, 'sisnr_snr_10': 5.6935, 'sisnr_snr_15': 3.0574, 'sisnr_snr_20': 0.604}
+2026-10-20 09:28:00,375 | INFO | saved D:\PROJECT\MLNC\output\result\frcrn-compare\compare-2026-10-20-09-28-00.json
