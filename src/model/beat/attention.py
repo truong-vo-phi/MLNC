@@ -50,6 +50,8 @@ class GatedRelPosAttention(nn.Module):
         if gru_rel_pos:
             self.grep_linear = nn.Linear(self.head_dim, 8)
             self.grep_a = nn.Parameter(torch.ones(1, num_heads, 1, 1))
+        self.record = False
+        self.cache: dict[str, torch.Tensor] = {}
 
     def compute_bias(self, length: int, device) -> torch.Tensor:
         pos = torch.arange(length, device=device)
@@ -64,10 +66,14 @@ class GatedRelPosAttention(nn.Module):
         if position_bias is None:
             position_bias = self.compute_bias(T, x.device)
         bias = position_bias
+        scale = None
         if self.gru_rel_pos:
             gate = torch.sigmoid(self.grep_linear(q).view(B, H, T, 2, 4).sum(-1))
             gate_a, gate_b = gate.chunk(2, dim=-1)  # (B, H, T, 1)
-            bias = (gate_a * (gate_b * self.grep_a - 1.0) + 2.0) * position_bias
+            scale = gate_a * (gate_b * self.grep_a - 1.0) + 2.0
+            bias = scale * position_bias
+        if self.record:
+            self.cache = {"q": q, "k": k, "v": v, "position_bias": position_bias, "scale": scale}
 
         attn = (q * self.scaling) @ k.transpose(-2, -1) + bias
         attn = self.dropout(F.softmax(attn, dim=-1))

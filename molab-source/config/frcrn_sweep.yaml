@@ -1,0 +1,54 @@
+# Sweep tham số huấn luyện FRCRN trên Mixture-36l, chọn theo SI-SNR của nhiễu ở SNR cao (15 và 20 dB).
+# Kiến trúc giữ nguyên (khớp checkpoint FRCRN_SE_16K); chỉ đổi tham số huấn luyện.
+wandb:
+  project: mlnc-frcrn-sweep
+  final_project: mlnc-frcrn-final   # lần huấn luyện cuối (cấu hình tốt nhất, nhiều epoch)
+
+drive:
+  dir: FA26_Capstone/Truong/frcrn-fine-tune   # mỗi lượt/seed một thư mục con <run_id>-...: best.pt, resume.pt, result.json
+
+sweep:
+  method: random
+  metric:
+    name: noise_si_snr_hi
+    goal: maximize
+  early_terminate:
+    type: hyperband
+    min_iter: 2
+    eta: 3
+  parameters:
+    lr:
+      distribution: log_uniform_values
+      min: 1.0e-5
+      max: 1.0e-3
+    lr_decay:
+      values: [1.0, 0.98]
+    halve_lr_after:
+      values: [2, 3, 5]
+    batch_size:
+      values: [12, 24]
+    segment_seconds:
+      values: [2.0, 4.0]
+    grad_clip:
+      values: [5.0, 10.0]
+    mask_weight:
+      values: [0.25, 1.0, 4.0]
+    target:
+      values: [noise, speech]
+    epochs:
+      value: 8
+    patience:
+      value: 8
+
+trial:
+  count: 12            # số lượt sweep (chưa đo thời gian/epoch, xem notebook bước đo thời gian)
+  confirm_epochs: 100
+  confirm_patience: 100   # bằng số epoch: không dừng sớm, để thấy cả đường cong
+  seeds: [0]
+  max_samples: 1200    # khớp sweep; null: toàn bộ tập (~30 phút/epoch, ước tính thô)
+  num_workers: 12
+
+metrics:
+  high_snr_levels: [15, 20]
+  report_snr_levels: [-5, 0, 5, 10, 15, 20]
+  perceptual_max_batches: 20

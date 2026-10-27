@@ -1,0 +1,62 @@
+# ReviewKD: FRCRN dùng chung -> teacher BEATs (đóng băng) và student DeiT-Tiny (huấn luyện) trên Mixture-36l.
+# Mỗi batch chạy FRCRN một lần: n^ chuẩn hoá RMS đi vào cả Fbank của BEATs lẫn log-mel của DeiT.
+# DeiT-Tiny patch 16 trên 128 x 398: lưới patch 8 x 24, khớp lưới BEATs (phần dư 14 khung bị bỏ).
+dataset:
+  name: mixture-36l
+  duration: 4.0
+
+frontend:
+  sample_rate: 16000
+  n_fft: 512
+  win_length: 400
+  hop_length: 160
+  n_mels: 128
+  f_min: 20.0
+  f_max: 8000.0
+  num_frames: 398
+  log_eps: 1.0e-6
+  norm_eps: 1.0e-5
+
+model:
+  arch: deit_tiny_patch16_224
+  label: DeiT-Tiny
+  family: ViT
+  num_classes: 36
+  freq_bins: 128
+  num_frames: 398
+  pretrained: true               # trọng số ImageNet của timm (conv patch gộp về 1 kênh)
+  dropout: 0.1
+  specaug_freq_masks: 2
+  specaug_freq_width: 16
+  specaug_time_masks: 2
+  specaug_time_width: 24
+
+review:
+  teacher_layers: [3, 6, 9, 12]
+  teacher_dim: 768
+  mid_channels: 512
+  resize: area
+  noise_from_residual: false     # FRCRN trong best.pt có target speech: FRCRNSeparator.forward đã trả n^ = x - ŝ
+
+teacher:
+  # fold0: BEATs fine-tune 36 lớp trên nhiễu thật (không kèm FRCRN, dùng n^ từ cache); RMS chuẩn hoá 0,07925
+  # tệp cũ pretrained/beat-ft/best.pt (format beats_mlkd_frcrn_v1) vẫn dùng được bằng cách đổi lại dòng dưới
+  checkpoint: pretrained/beat-ft/beats_teacher_fold0_weights.pt
+  probe_clips: 512               # số clip validation để đo độ chính xác teacher trước khi chưng cất
+
+train:
+  lr: 3.0e-4
+  weight_decay: 0.05
+  betas: [0.9, 0.999]
+  warmup_ratio: 0.05
+  min_lr_ratio: 0.0
+  label_smoothing: 0.1
+  grad_clip: 1.0
+  batch_size: 32
+  eval_batch_size: 64
+  epochs: 20
+  patience: 20                   # không dừng sớm trong 20 epoch thử
+  review_weight: 1.0
+  review_warmup_epochs: 2
+  hcl_levels: [4, 2, 1]
+  seed: 42

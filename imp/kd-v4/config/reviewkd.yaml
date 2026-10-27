@@ -1,0 +1,69 @@
+# ReviewKD: teacher FRCRN -> BEATs (đóng băng), student PANNs CNN10 (huấn luyện từ đầu) trên Mixture-36l.
+# Student dùng num_frames 398 (toàn bộ clip 4 s, không cắt) để lưới đặc trưng stage 4 (8 x 24) khớp lưới patch BEATs.
+dataset:
+  name: mixture-36l
+  duration: 4.0
+  noise_dataset: audioset-40l
+
+frontend:
+  sample_rate: 16000
+  n_fft: 512
+  win_length: 400
+  hop_length: 160
+  n_mels: 128
+  f_min: 20.0
+  f_max: 8000.0
+  num_frames: 398
+  log_eps: 1.0e-6
+  norm_eps: 1.0e-5
+
+model:
+  arch: cnn10
+  label: PANNs CNN10 (pretrain AudioSet)
+  family: CNN
+  num_classes: 36
+  freq_bins: 128
+  num_frames: 398
+  # true: nạp Cnn10_mAP=0.380.pth (Zenodo, tự tải vào pretrained/) cho 4 conv block và fc; bỏ bn0, mel và head 527 lớp.
+  # PANNs gốc dùng 32 kHz/64 mel; front-end ở đây 16 kHz/128 mel nên lệch phân phối đầu vào, trọng số conv chỉ là khởi tạo tốt.
+  pretrained: true
+  channels: [64, 128, 256, 512]
+  dropout: 0.1
+  specaug_freq_masks: 2
+  specaug_freq_width: 16
+  specaug_time_masks: 2
+  specaug_time_width: 24
+
+review:
+  teacher_layers: [3, 6, 9, 12]   # TODO: chưa kiểm chứng lớp BEATs nào cho đặc trưng tốt nhất (ablation)
+  teacher_dim: 768
+  mid_channels: 512               # min(512, kênh stage cuối) như mã gốc ReviewKD
+  resize: area                    # mã gốc dùng nearest; area tránh răng cưa khi thu nhỏ stage 1 (64x199 -> 8x24)
+  # Hai giá trị dưới lấy từ teacher KD-MoE đã chạy (output/log/kdmoe-teacher-2026-10-11-18-55-14.log):
+  # T1 chọn đầu ra FRCRN trực tiếp (SI-SDR 13.5 dB so với -21.2 dB của x - đầu ra ở -5 dB); T3 r = 0.07925.
+  # Đặt target_rms: 0 để tính lại từ AudioSet train, noise_from_residual: null để tự chọn bằng SI-SDR.
+  target_rms: 0.07925
+  noise_from_residual: false
+
+teacher:
+  frcrn_checkpoint: pretrained/frcrn_best.pt        # ba bản frcrn_*.pt/FRCRN/best.pt trùng md5
+  beats_checkpoint: pretrained/BEATs_iter3_plus_AS2M.pt
+  beats_finetuned: null                             # đường dẫn best.pt BEATs đã fine-tune 36 lớp (nếu muốn)
+  rms_clips: 2000                                   # số clip nhiễu để tính trung vị RMS
+
+train:
+  lr: 3.0e-4
+  weight_decay: 0.05
+  betas: [0.9, 0.999]
+  warmup_ratio: 0.05
+  min_lr_ratio: 0.0
+  label_smoothing: 0.1
+  grad_clip: 1.0
+  batch_size: 32
+  eval_batch_size: 64
+  epochs: 100
+  patience: 15
+  review_weight: 1.0              # λ của loss ReviewKD; 0 = baseline CE thuần
+  review_warmup_epochs: 5         # mã gốc: 20 epoch trên 240 epoch; ở đây tỉ lệ tương đương
+  hcl_levels: [4, 2, 1]
+  seed: 42
