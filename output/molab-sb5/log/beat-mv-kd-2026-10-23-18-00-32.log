@@ -1,0 +1,142 @@
+18:00:32 | INFO    | run beat-mv-kd-2026-10-23-18-00-32 | device cuda | RUN_TRAINING=True | qkv=True crd=True logit=True
+18:00:33 | INFO    | teacher fold 0 | epoch 1 | clean_val_accuracy 0.7402 | macro_f1 0.7110
+18:00:34 | INFO    | teacher qkv (12, 3, 2, 192, 768) | embedding (2, 768) | lưới token (8, 24)
+18:00:34 | INFO    | FRCRN best_e037_20261020T203958Z.pt | missing 0 unexpected 0
+18:00:35 | INFO    | student 45.04M tham số (transformer 42.56M) | embedding 768
+18:00:35 | INFO    | student lớp  1 (khối 1) q/k/v (3, 2, 200, 768) lưới token (8, 25) <-> BEATs lớp  1 (lưới (8, 24))
+18:00:35 | INFO    | student lớp  2 (khối 1) q/k/v (3, 2, 200, 768) lưới token (8, 25) <-> BEATs lớp  2 (lưới (8, 24))
+18:00:35 | INFO    | student lớp  3 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  3 (lưới (8, 24))
+18:00:35 | INFO    | student lớp  4 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  4 (lưới (8, 24))
+18:00:35 | INFO    | student lớp  5 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  5 (lưới (8, 24))
+18:00:35 | INFO    | student lớp  6 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  6 (lưới (8, 24))
+18:00:35 | INFO    | student lớp  7 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  7 (lưới (8, 24))
+18:00:35 | INFO    | student lớp  8 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  8 (lưới (8, 24))
+18:00:35 | INFO    | student lớp  9 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp  9 (lưới (8, 24))
+18:00:35 | INFO    | student lớp 10 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp 10 (lưới (8, 24))
+18:00:35 | INFO    | student lớp 11 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp 11 (lưới (8, 24))
+18:00:35 | INFO    | student lớp 12 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp 12 (lưới (8, 24))
+18:01:01 | INFO    | FRCRN best_e037_20261020T203958Z.pt | missing 0 unexpected 0
+18:01:01 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit | student 45.04M | crd 0.20M | train 30240 mẫu
+18:03:15 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 1 | loss 3.3946 ce 3.3946 cos 0.9999 rel 0.2607 crd 9.9369 kl 4.4272 | train acc 0.0928 | val macro_acc 0.1344 mAP_macro 0.1514 | lr 4.00e-05
+18:05:28 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 2 | loss 4.2199 ce 3.0935 cos 0.5914 rel 0.2118 crd 1.8190 kl 3.9194 | train acc 0.1828 | val macro_acc 0.2079 mAP_macro 0.2223 | lr 8.00e-05
+18:07:41 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 3 | loss 4.8267 ce 2.9062 cos 0.4911 rel 0.1745 crd 1.1822 kl 3.5444 | train acc 0.2578 | val macro_acc 0.2769 mAP_macro 0.3112 | lr 1.00e-04
+18:09:53 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 4 | loss 5.4846 ce 2.7539 cos 0.4620 rel 0.1643 crd 1.4541 kl 3.1977 | train acc 0.3271 | val macro_acc 0.2938 mAP_macro 0.3259 | lr 1.00e-04
+18:12:08 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 5 | loss 6.0301 ce 2.6397 cos 0.4477 rel 0.1596 crd 1.4621 kl 2.8996 | train acc 0.3765 | val macro_acc 0.3049 mAP_macro 0.3469 | lr 1.00e-04
+18:14:20 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 6 | loss 6.5338 ce 2.5438 cos 0.4387 rel 0.1554 crd 1.4117 kl 2.6901 | train acc 0.4201 | val macro_acc 0.3424 mAP_macro 0.3685 | lr 1.00e-04
+18:16:31 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 7 | loss 6.4032 ce 2.4681 cos 0.4336 rel 0.1535 crd 1.5892 kl 2.5534 | train acc 0.4540 | val macro_acc 0.3397 mAP_macro 0.3696 | lr 1.00e-04
+18:18:43 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 8 | loss 6.2298 ce 2.3997 cos 0.4291 rel 0.1520 crd 1.6042 kl 2.4469 | train acc 0.4844 | val macro_acc 0.3398 mAP_macro 0.3705 | lr 1.00e-04
+18:20:55 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 9 | loss 6.0524 ce 2.3245 cos 0.4258 rel 0.1500 crd 1.5850 kl 2.3596 | train acc 0.5125 | val macro_acc 0.3480 mAP_macro 0.3840 | lr 1.00e-04
+18:23:07 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 10 | loss 5.9112 ce 2.2747 cos 0.4240 rel 0.1493 crd 1.5213 kl 2.3025 | train acc 0.5333 | val macro_acc 0.3367 mAP_macro 0.3720 | lr 1.00e-04
+18:25:21 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 11 | loss 5.8064 ce 2.2287 cos 0.4206 rel 0.1475 crd 1.5741 kl 2.2225 | train acc 0.5556 | val macro_acc 0.3588 mAP_macro 0.3909 | lr 1.00e-04
+18:27:33 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 12 | loss 5.7914 ce 2.1753 cos 0.4191 rel 0.1466 crd 1.7294 kl 2.1857 | train acc 0.5752 | val macro_acc 0.3628 mAP_macro 0.3977 | lr 1.00e-04
+18:29:46 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 13 | loss 5.6353 ce 2.1461 cos 0.4169 rel 0.1456 crd 1.5652 kl 2.1440 | train acc 0.5925 | val macro_acc 0.3505 mAP_macro 0.3820 | lr 1.00e-04
+18:31:58 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 14 | loss 5.5229 ce 2.1151 cos 0.4142 rel 0.1437 crd 1.5159 kl 2.0919 | train acc 0.6057 | val macro_acc 0.3656 mAP_macro 0.4025 | lr 1.00e-04
+18:34:13 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 15 | loss 5.4737 ce 2.0746 cos 0.4124 rel 0.1429 crd 1.5909 kl 2.0483 | train acc 0.6221 | val macro_acc 0.3616 mAP_macro 0.3829 | lr 1.00e-04
+18:36:24 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 16 | loss 5.4592 ce 2.0493 cos 0.4108 rel 0.1420 crd 1.6809 kl 2.0167 | train acc 0.6330 | val macro_acc 0.3850 mAP_macro 0.4140 | lr 1.00e-04
+18:38:37 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 17 | loss 5.3801 ce 2.0149 cos 0.4079 rel 0.1398 crd 1.6743 kl 1.9805 | train acc 0.6461 | val macro_acc 0.3586 mAP_macro 0.4006 | lr 1.00e-04
+18:40:49 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 18 | loss 5.3137 ce 2.0091 cos 0.4074 rel 0.1400 crd 1.5493 kl 1.9826 | train acc 0.6512 | val macro_acc 0.3735 mAP_macro 0.4107 | lr 1.00e-04
+18:43:01 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 19 | loss 5.2626 ce 1.9795 cos 0.4054 rel 0.1389 crd 1.5986 kl 1.9394 | train acc 0.6646 | val macro_acc 0.3580 mAP_macro 0.3957 | lr 1.00e-04
+18:43:01 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit: val macro_acc không cải thiện, giảm lr 1.00e-04 -> 5.00e-05
+18:45:14 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 20 | loss 5.5005 ce 1.9016 cos 0.3970 rel 0.1334 crd 2.4268 kl 1.8551 | train acc 0.6989 | val macro_acc 0.3875 mAP_macro 0.4218 | lr 5.00e-05
+18:47:27 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 21 | loss 5.4270 ce 1.8648 cos 0.3933 rel 0.1306 crd 2.4735 kl 1.8016 | train acc 0.7065 | val macro_acc 0.3772 mAP_macro 0.4106 | lr 5.00e-05
+18:49:40 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 22 | loss 5.3442 ce 1.8760 cos 0.3920 rel 0.1297 crd 2.2533 kl 1.8198 | train acc 0.7098 | val macro_acc 0.3900 mAP_macro 0.4207 | lr 5.00e-05
+18:49:40 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit: val macro_acc không cải thiện, giảm lr 5.00e-05 -> 2.50e-05
+18:51:54 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 23 | loss 5.4421 ce 1.8527 cos 0.3879 rel 0.1276 crd 2.6629 kl 1.7425 | train acc 0.7228 | val macro_acc 0.3968 mAP_macro 0.4211 | lr 2.50e-05
+18:54:07 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 24 | loss 5.6586 ce 1.8231 cos 0.3857 rel 0.1256 crd 3.1486 kl 1.7499 | train acc 0.7345 | val macro_acc 0.3890 mAP_macro 0.4171 | lr 2.50e-05
+18:56:19 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 25 | loss 5.6746 ce 1.8220 cos 0.3843 rel 0.1245 crd 3.2311 kl 1.7282 | train acc 0.7321 | val macro_acc 0.4043 mAP_macro 0.4246 | lr 2.50e-05
+18:58:32 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 26 | loss 5.5720 ce 1.8158 cos 0.3829 rel 0.1237 crd 3.0592 kl 1.7200 | train acc 0.7371 | val macro_acc 0.4012 mAP_macro 0.4257 | lr 2.50e-05
+19:00:46 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 27 | loss 5.4368 ce 1.8127 cos 0.3822 rel 0.1233 crd 2.8388 kl 1.6991 | train acc 0.7376 | val macro_acc 0.4045 mAP_macro 0.4328 | lr 2.50e-05
+19:03:02 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 28 | loss 5.4172 ce 1.7796 cos 0.3813 rel 0.1227 crd 2.8562 kl 1.7054 | train acc 0.7452 | val macro_acc 0.3931 mAP_macro 0.4217 | lr 2.50e-05
+19:03:02 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit: val macro_acc không cải thiện, giảm lr 2.50e-05 -> 1.25e-05
+19:05:15 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 29 | loss 5.5498 ce 1.7636 cos 0.3787 rel 0.1216 crd 3.2920 kl 1.6399 | train acc 0.7504 | val macro_acc 0.4006 mAP_macro 0.4273 | lr 1.25e-05
+19:07:30 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 30 | loss 5.8739 ce 1.7764 cos 0.3782 rel 0.1211 crd 3.9189 kl 1.6387 | train acc 0.7532 | val macro_acc 0.3991 mAP_macro 0.4247 | lr 1.25e-05
+19:09:44 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 31 | loss 6.1030 ce 1.7635 cos 0.3777 rel 0.1212 crd 4.3451 kl 1.6681 | train acc 0.7523 | val macro_acc 0.4012 mAP_macro 0.4274 | lr 1.25e-05
+19:09:44 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit: val macro_acc không cải thiện, giảm lr 1.25e-05 -> 6.25e-06
+19:11:57 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 32 | loss 6.2667 ce 1.7590 cos 0.3762 rel 0.1202 crd 4.7283 kl 1.6471 | train acc 0.7559 | val macro_acc 0.4025 mAP_macro 0.4291 | lr 6.25e-06
+19:14:10 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 33 | loss 6.6719 ce 1.7441 cos 0.3759 rel 0.1201 crd 5.5893 kl 1.6371 | train acc 0.7586 | val macro_acc 0.4028 mAP_macro 0.4276 | lr 6.25e-06
+19:16:23 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 34 | loss 6.6151 ce 1.7649 cos 0.3755 rel 0.1198 crd 5.4601 kl 1.6248 | train acc 0.7569 | val macro_acc 0.4048 mAP_macro 0.4312 | lr 6.25e-06
+19:16:23 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit: val macro_acc không cải thiện, giảm lr 6.25e-06 -> 3.13e-06
+19:18:35 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 35 | loss 6.8390 ce 1.7512 cos 0.3749 rel 0.1197 crd 5.9602 kl 1.6129 | train acc 0.7591 | val macro_acc 0.4039 mAP_macro 0.4304 | lr 3.13e-06
+19:20:47 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 36 | loss 7.0543 ce 1.7369 cos 0.3745 rel 0.1194 crd 6.4301 kl 1.6084 | train acc 0.7634 | val macro_acc 0.4040 mAP_macro 0.4290 | lr 3.13e-06
+19:23:01 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 37 | loss 7.1460 ce 1.7454 cos 0.3744 rel 0.1193 crd 6.6268 kl 1.5934 | train acc 0.7604 | val macro_acc 0.4060 mAP_macro 0.4317 | lr 3.13e-06
+19:23:01 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit: val macro_acc không cải thiện, giảm lr 3.13e-06 -> 1.56e-06
+19:25:16 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 38 | loss 6.9644 ce 1.7710 cos 0.3741 rel 0.1192 crd 6.1561 kl 1.6221 | train acc 0.7560 | val macro_acc 0.4066 mAP_macro 0.4314 | lr 1.56e-06
+19:27:28 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 39 | loss 7.2472 ce 1.7483 cos 0.3739 rel 0.1189 crd 6.8144 kl 1.5989 | train acc 0.7605 | val macro_acc 0.4069 mAP_macro 0.4297 | lr 1.56e-06
+19:29:40 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 40 | loss 7.3376 ce 1.7334 cos 0.3737 rel 0.1190 crd 7.0189 kl 1.6021 | train acc 0.7658 | val macro_acc 0.4108 mAP_macro 0.4318 | lr 1.56e-06
+19:31:53 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 41 | loss 7.4764 ce 1.7334 cos 0.3737 rel 0.1191 crd 7.2628 kl 1.6188 | train acc 0.7644 | val macro_acc 0.4093 mAP_macro 0.4303 | lr 1.56e-06
+19:34:05 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 42 | loss 7.3594 ce 1.7391 cos 0.3731 rel 0.1187 crd 7.0309 kl 1.6130 | train acc 0.7627 | val macro_acc 0.4049 mAP_macro 0.4285 | lr 1.56e-06
+19:36:20 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 43 | loss 7.3901 ce 1.7567 cos 0.3739 rel 0.1192 crd 7.0429 kl 1.6188 | train acc 0.7568 | val macro_acc 0.4005 mAP_macro 0.4266 | lr 1.56e-06
+19:36:20 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit: val macro_acc không cải thiện, giảm lr 1.56e-06 -> 1.00e-06
+19:38:31 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 44 | loss 7.2906 ce 1.7593 cos 0.3737 rel 0.1191 crd 6.8532 kl 1.6120 | train acc 0.7576 | val macro_acc 0.4051 mAP_macro 0.4316 | lr 1.00e-06
+19:40:46 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 45 | loss 7.2919 ce 1.7529 cos 0.3734 rel 0.1189 crd 6.8551 kl 1.6192 | train acc 0.7617 | val macro_acc 0.3985 mAP_macro 0.4262 | lr 1.00e-06
+19:42:58 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 46 | loss 7.2723 ce 1.7505 cos 0.3732 rel 0.1186 crd 6.8437 kl 1.6081 | train acc 0.7611 | val macro_acc 0.4090 mAP_macro 0.4311 | lr 1.00e-06
+19:45:10 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 47 | loss 7.4613 ce 1.7337 cos 0.3730 rel 0.1186 crd 7.3182 kl 1.5768 | train acc 0.7664 | val macro_acc 0.4066 mAP_macro 0.4319 | lr 1.00e-06
+19:47:23 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 48 | loss 7.5043 ce 1.7125 cos 0.3728 rel 0.1185 crd 7.4454 kl 1.5778 | train acc 0.7664 | val macro_acc 0.4088 mAP_macro 0.4333 | lr 1.00e-06
+19:49:35 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 49 | loss 7.3663 ce 1.7555 cos 0.3730 rel 0.1187 crd 7.0154 kl 1.6114 | train acc 0.7602 | val macro_acc 0.4054 mAP_macro 0.4300 | lr 1.00e-06
+19:51:47 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit epoch 50 | loss 7.4640 ce 1.7348 cos 0.3729 rel 0.1186 crd 7.3135 kl 1.5809 | train acc 0.7634 | val macro_acc 0.4074 mAP_macro 0.4318 | lr 1.00e-06
+19:51:48 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit: validation tại epoch tốt nhất 40, 9 chỉ số theo SNR
+        top1_accuracy  top3_accuracy  balanced_accuracy  precision_macro  recall_macro  macro_f1  micro_f1     mAP  macro_auc
+snr_db                                                                                                                       
+-5             0.4444         0.6500             0.4444           0.4424        0.4444    0.4232    0.4444  0.4624     0.9095
+0              0.4556         0.6602             0.4556           0.4752        0.4556    0.4459    0.4556  0.4737     0.9120
+5              0.4315         0.6454             0.4315           0.4504        0.4315    0.4241    0.4315  0.4591     0.9047
+10             0.4065         0.6194             0.4065           0.4376        0.4065    0.4001    0.4065  0.4361     0.8908
+15             0.3806         0.5935             0.3806           0.4040        0.3806    0.3757    0.3806  0.4050     0.8786
+20             0.3463         0.5269             0.3463           0.3993        0.3463    0.3463    0.3463  0.3545     0.8497
+mean           0.4108         0.6159             0.4108           0.4348        0.4108    0.4026    0.4108  0.4318     0.8909
+19:51:56 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit validation: 12 cặp nhầm nhiều nhất (thật -> đoán, tỉ lệ trên lớp thật)
+  Saxophone -> Trumpet: 24% (44 clip)
+  Microwave oven -> Gong: 24% (43 clip)
+  Saxophone -> Clarinet: 21% (37 clip)
+  Hi-hat -> Trumpet: 20% (36 clip)
+  Shatter -> Squeak: 19% (34 clip)
+  Harmonica -> Trumpet: 18% (33 clip)
+  Violin, fiddle -> Saxophone: 18% (32 clip)
+  Glockenspiel -> Electric piano: 17% (31 clip)
+  Scissors -> Tearing: 17% (30 clip)
+  Violin, fiddle -> Clarinet: 16% (28 clip)
+  Fart -> Computer keyboard: 15% (27 clip)
+  Fireworks -> Gunshot, gunfire: 15% (27 clip)
+19:51:56 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit validation: 8 lớp yếu nhất theo recall
+               label  recall  precision    AP  most_confused_as  confused_rate
+      Microwave oven   0.050      0.158 0.103              Gong          0.239
+      Violin, fiddle   0.111      0.323 0.255         Saxophone          0.178
+       Keys jangling   0.167      0.333 0.256 Computer keyboard          0.150
+                Fart   0.189      0.442 0.244 Computer keyboard          0.150
+        Glockenspiel   0.217      0.285 0.188    Electric piano          0.172
+      Electric piano   0.244      0.312 0.265           Trumpet          0.117
+             Writing   0.250      0.276 0.146            Squeak          0.139
+Drawer open or close   0.250      0.495 0.342         Telephone          0.144
+19:57:53 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit test: 12 cặp nhầm nhiều nhất (thật -> đoán, tỉ lệ trên lớp thật)
+  Violin, fiddle -> Clarinet: 37% (67 clip)
+  Chime -> Glockenspiel: 31% (56 clip)
+  Glockenspiel -> Chime: 29% (53 clip)
+  Fireworks -> Gunshot, gunfire: 28% (51 clip)
+  Cough -> Bark: 24% (43 clip)
+  Saxophone -> Harmonica: 23% (42 clip)
+  Acoustic guitar -> Electric piano: 22% (39 clip)
+  Squeak -> Telephone: 21% (37 clip)
+  Microwave oven -> Gong: 20% (36 clip)
+  Fart -> Knock: 19% (35 clip)
+  Clarinet -> Trumpet: 18% (33 clip)
+  Trumpet -> Clarinet: 18% (33 clip)
+19:57:53 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit test: 8 lớp yếu nhất theo recall
+               label  recall  precision    AP  most_confused_as  confused_rate
+Drawer open or close   0.006      0.045 0.110             Knock          0.117
+       Keys jangling   0.056      0.100 0.132           Writing          0.172
+      Violin, fiddle   0.067      0.197 0.197          Clarinet          0.372
+      Microwave oven   0.078      0.212 0.147              Gong          0.200
+        Glockenspiel   0.189      0.231 0.159             Chime          0.294
+              Hi-hat   0.206      0.698 0.326          Clarinet          0.161
+             Writing   0.206      0.186 0.136 Computer keyboard          0.161
+            Scissors   0.217      0.235 0.193           Tearing          0.156
+19:57:53 | INFO    | mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit: TEST, 9 chỉ số theo SNR
+        top1_accuracy  top3_accuracy  balanced_accuracy  precision_macro  recall_macro  macro_f1  micro_f1     mAP  macro_auc
+snr_db                                                                                                                       
+-5             0.4093         0.6204             0.4093           0.4096        0.4093    0.3947    0.4093  0.4560     0.9102
+0              0.3981         0.6213             0.3981           0.4041        0.3981    0.3831    0.3981  0.4399     0.9032
+5              0.3824         0.5713             0.3824           0.3911        0.3824    0.3659    0.3824  0.4065     0.8932
+10             0.3704         0.5796             0.3704           0.3796        0.3704    0.3557    0.3704  0.3944     0.8925
+15             0.3704         0.5704             0.3704           0.3824        0.3704    0.3600    0.3704  0.3873     0.8758
+20             0.3269         0.5287             0.3269           0.3568        0.3269    0.3165    0.3269  0.3311     0.8534
+mean           0.3762         0.5819             0.3762           0.3873        0.3762    0.3626    0.3762  0.4025     0.8880

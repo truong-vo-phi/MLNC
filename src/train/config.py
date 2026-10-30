@@ -53,6 +53,14 @@ class BEATTrainConfig(TrainConfig):
     warmup_ratio: float = 0.1
     min_lr_ratio: float = 0.0
     label_smoothing: float = 0.0
+    plateau_factor: float = 0.0
+    plateau_patience: int = 3
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.plateau_factor < 1.0:
+            raise ValueError(f"plateau_factor must be in [0, 1), got {self.plateau_factor}")
+        if self.plateau_patience <= 0:
+            raise ValueError(f"plateau_patience must be positive, got {self.plateau_patience}")
 
 
 @dataclass(frozen=True)

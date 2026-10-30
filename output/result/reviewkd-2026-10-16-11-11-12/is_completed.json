@@ -1,0 +1,10 @@
+{
+  "is_completed": false,
+  "mode": "full",
+  "run_id": "reviewkd-2026-10-16-11-11-12",
+  "note": "Full run (RUN_TRAINING=True) tren molab sb-1ebc073920fe2be2 (RTX PRO 6000). cnn10-ce early stop @ 43 (best 0.426 @ 28); cnn10-reviewkd best 0.438 @ 19, stale 14/15 qua epoch 33 - sandbox molab bi ket thuc truoc epoch 34 (early stop) nen cell is_completed khong chay. 9 metrics duoc tinh lai local tu best checkpoint (evaluate_baselines-style, snr_scores) va ghi vao result.csv; CE khop voi history backup (0.4262 vs 0.4264). history/cnn10-reviewkd.json khong ton tai (chua den luc ghi).",
+  "models": [
+    "cnn10-reviewkd",
+    "cnn10-ce"
+  ]
+}

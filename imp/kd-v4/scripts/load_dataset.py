@@ -221,6 +221,7 @@ class Mixture36Dataset(LabeledAudioDataset):
         load_noise: bool = False,
         load_clean: bool = False,
         snr_db: tuple[float, ...] | None = None,
+        sample_ids_file: str | Path | None = None,
     ) -> None:
         super().__init__(root, split, sample_rate, duration)
         self.load_noise = load_noise
@@ -233,6 +234,9 @@ class Mixture36Dataset(LabeledAudioDataset):
         if snr_db is not None:
             allowed = set(snr_db)
             rows = [row for row in rows if float(row["target_snr_db"]) in allowed]
+        if sample_ids_file is not None:
+            keep = {row["sample_id"] for row in read_csv(Path(sample_ids_file))}
+            rows = [row for row in rows if row["sample_id"] in keep]
         self.rows = rows
 
     def __len__(self) -> int:

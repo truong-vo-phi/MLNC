@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 420" width="1000" height="420" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475467"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="420" fill="#FFFFFF"/>
+
+  <rect x="20" y="40" width="160" height="70" rx="8" fill="#F2F4F7" stroke="#475467" stroke-width="1.5"/>
+  <text x="100" y="66" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Hỗn hợp x</text>
+  <text x="100" y="88" text-anchor="middle" font-size="12" fill="#475467">16 kHz, 64 000 mẫu</text>
+
+  <rect x="220" y="40" width="160" height="70" rx="8" fill="#ECFDF3" stroke="#12B76A" stroke-width="1.5"/>
+  <text x="300" y="66" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Chuẩn hoá biên độ</text>
+  <text x="300" y="88" text-anchor="middle" font-size="12" fill="#475467">mức −25 dB</text>
+
+  <rect x="420" y="40" width="160" height="70" rx="8" fill="#ECFDF3" stroke="#12B76A" stroke-width="1.5"/>
+  <text x="500" y="66" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">STFT</text>
+  <text x="500" y="88" text-anchor="middle" font-size="12" fill="#475467">cửa sổ 640, bước 320</text>
+
+  <rect x="620" y="40" width="160" height="70" rx="8" fill="#ECFDF3" stroke="#12B76A" stroke-width="1.5"/>
+  <text x="700" y="66" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">UNet #1</text>
+  <text x="700" y="88" text-anchor="middle" font-size="12" fill="#475467">đặc trưng phổ</text>
+
+  <rect x="820" y="40" width="160" height="70" rx="8" fill="#ECFDF3" stroke="#12B76A" stroke-width="1.5"/>
+  <text x="900" y="66" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">UNet #2</text>
+  <text x="900" y="88" text-anchor="middle" font-size="12" fill="#475467">tinh chỉnh từ UNet #1</text>
+
+  <rect x="820" y="190" width="160" height="70" rx="8" fill="#ECFDF3" stroke="#12B76A" stroke-width="1.5"/>
+  <text x="900" y="216" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Mặt nạ M</text>
+  <text x="900" y="238" text-anchor="middle" font-size="12" fill="#475467">tanh(U1) + tanh(U2)</text>
+
+  <rect x="620" y="190" width="160" height="70" rx="8" fill="#ECFDF3" stroke="#12B76A" stroke-width="1.5"/>
+  <text x="700" y="216" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Nhân phức</text>
+  <text x="700" y="238" text-anchor="middle" font-size="12" fill="#475467">X · M</text>
+
+  <rect x="420" y="190" width="160" height="70" rx="8" fill="#ECFDF3" stroke="#12B76A" stroke-width="1.5"/>
+  <text x="500" y="216" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">iSTFT</text>
+  <text x="500" y="238" text-anchor="middle" font-size="12" fill="#475467">về miền thời gian</text>
+
+  <rect x="220" y="190" width="160" height="70" rx="8" fill="#ECFDF3" stroke="#12B76A" stroke-width="1.5"/>
+  <text x="300" y="216" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">ŝ (giọng)</text>
+  <text x="300" y="238" text-anchor="middle" font-size="12" fill="#475467">ước lượng</text>
+
+  <rect x="20" y="190" width="160" height="70" rx="8" fill="#F9F5FF" stroke="#7F56D9" stroke-width="1.5"/>
+  <text x="100" y="216" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">n̂ = x − ŝ</text>
+  <text x="100" y="238" text-anchor="middle" font-size="12" fill="#475467">phần còn lại: nhiễu</text>
+
+  <rect x="20" y="300" width="300" height="56" rx="8" fill="#EFF8FF" stroke="#1570EF" stroke-width="1.5"/>
+  <text x="170" y="324" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">RMS chuẩn hoá → BEATs</text>
+  <text x="170" y="344" text-anchor="middle" font-size="12" fill="#475467">input_rms lấy từ checkpoint teacher</text>
+
+  <path d="M180,75 H220" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M380,75 H420" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M580,75 H620" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M780,75 H820" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M900,110 V190" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M820,225 H780" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M620,225 H580" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M420,225 H380" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M220,225 H180" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M100,260 V300" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <path d="M100,110 V190" fill="none" stroke="#7F56D9" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="108" y="152" font-size="12" fill="#7F56D9">x đi thẳng</text>
+  <path d="M500,110 V150 H700 V190" fill="none" stroke="#1570EF" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="600" y="143" font-size="12" fill="#1570EF">X = STFT(x)</text>
+
+  <rect x="360" y="300" width="620" height="90" rx="8" fill="#FFFFFF" stroke="#D0D5DD" stroke-width="1"/>
+  <text x="376" y="326" font-size="13" fill="#101828">FRCRN học mask phức theo ideal ratio mask của giọng nói.</text>
+  <text x="376" y="348" font-size="13" fill="#101828">Đầu ra của separator là x − ŝ: khử giọng, giữ lại nhiễu cần phân loại.</text>
+  <text x="376" y="370" font-size="12" fill="#475467">Mô-đun FRCRNSeparator.forward, target = speech.</text>
+</svg>

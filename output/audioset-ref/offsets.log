@@ -1,0 +1,6 @@
+2026-10-19 00:11:14,382 | INFO | clip cache: 579 clip -> C:\Users\phitr\AppData\Local\Temp\claude\D--PROJECT-MLNC\3ccc6c75-c232-45e9-a97c-80c09a2aa35f\scratchpad\clip_cache
+2026-10-19 00:13:07,438 | INFO | offsets validation: 6480 hàng -> output\audioset-ref\offsets_validation.csv
+2026-10-19 00:13:07,501 | INFO | validation: {'rows': 6480, 'median': 0.0010771726664216435, 'kept@0.001': 0.48410493827160495, 'kept@0.01': 0.7898148148148149, 'kept@0.05': 0.9083333333333333, 'kept@0.1': 0.9425925925925925}
+2026-10-19 00:13:49,920 | INFO | clip cache: 2692 clip -> C:\Users\phitr\AppData\Local\Temp\claude\D--PROJECT-MLNC\3ccc6c75-c232-45e9-a97c-80c09a2aa35f\scratchpad\clip_cache
+2026-10-19 00:20:48,944 | INFO | offsets train: 30240 hàng -> output\audioset-ref\offsets_train.csv
+2026-10-19 00:20:49,177 | INFO | train: {'rows': 30240, 'median': 0.0012379321314426191, 'kept@0.001': 0.4656084656084656, 'kept@0.01': 0.8017857142857143, 'kept@0.05': 0.9235449735449736, 'kept@0.1': 0.9505621693121693}

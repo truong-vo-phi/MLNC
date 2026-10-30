@@ -1,0 +1,85 @@
+dataset:
+  name: mixture-36l
+  duration: 4.0
+  noise_cache: null              # TODO: thư mục chứa train.npy / validation.npy / *.done của n^
+  train_sample_ids: null
+  validation_sample_ids: null    # ví dụ validation_clean.csv (tương đối với gốc dataset)
+  test_sample_ids: null
+  snr_db: null
+
+frontend:
+  sample_rate: 16000
+  n_fft: 512
+  win_length: 400
+  hop_length: 160
+  n_mels: 64
+  f_min: 20.0
+  f_max: 8000.0
+  num_frames: 398
+  log_eps: 1.0e-6
+  norm_eps: 1.0e-5
+
+specaugment:
+  freq_masks: 2
+  freq_width: 8
+  time_masks: 2
+  time_width: 24
+
+student:
+  arch: deit_tiny_patch16_224
+  num_classes: 36
+  freq_bins: 64
+  frames: 398
+  init: ced-tiny                # ced-tiny | imagenet | none
+  ced_repo: mispeech/ced-tiny
+  ced_path: null                # TODO: chỉ định model.safetensors cục bộ để chạy offline
+  dropout: 0.0
+  attn_dropout: 0.0
+  drop_path: 0.0
+  post_ln: false
+  pre_ln: true
+  bias_init: zero
+
+teacher:
+  checkpoint: ../../pretrained/beat-ft/beats_teacher_fold0_weights.pt
+  config: config/beat.yaml
+  input_rms: 0.07925
+
+loss:
+  temperature: 4.0
+  weight: 1.0
+  label_smoothing: 0.1
+
+attention:
+  # AT trên energy hidden state (sau gộp tần số teacher 8 -> student 4), trung bình qua các layer.
+  at_weight: 1000.0
+  at_layers: [4, 8, 12]
+  # BEATs bias: scale cổng GRU và position bias, sau gộp head 12 -> 3 và gộp token theo tần số.
+  bias_scale_weight: 1.0
+  bias_pos_weight: 1.0
+  bias_layers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  time_patches: 24
+  teacher_freq_patches: 8
+  student_freq_patches: 4
+
+train:
+  epochs: 30
+  patience: 7
+  lr: 1.0e-4
+  weight_decay: 0.1
+  betas: [0.9, 0.999]
+  warmup_steps: 500
+  lr_patience: 1
+  lr_decay: 0.5
+  min_lr: 1.0e-6
+  grad_clip: 1.0
+  batch_size: 32
+  eval_batch_size: 64
+  mixup: 0.8
+  mixup_alpha: 0.4
+  gap_penalty: 0.2
+  train_eval_clips: 2000
+  num_workers: 4
+  seed: 42
+  selection_metric: score
+  amp: true

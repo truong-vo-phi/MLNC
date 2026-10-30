@@ -1,0 +1,137 @@
+dataset:
+  name: mixture-36l
+  duration: 4.0
+frontend:
+  sample_rate: 16000
+  n_fft: 512
+  win_length: 400
+  hop_length: 160
+  n_mels: 128
+  f_min: 20.0
+  f_max: 8000.0
+  num_frames: 384
+  log_eps: 1.0e-06
+  norm_eps: 1.0e-05
+model:
+  freq_bins: 128
+  num_frames: 384
+  pretrained: false
+  dropout: 0.1
+  specaug_freq_masks: 2
+  specaug_freq_width: 16
+  specaug_time_masks: 2
+  specaug_time_width: 24
+train:
+  lr: 0.0003
+  weight_decay: 0.05
+  betas:
+  - 0.9
+  - 0.999
+  warmup_ratio: 0.05
+  min_lr_ratio: 0.0
+  label_smoothing: 0.1
+  grad_clip: 1.0
+  batch_size: 32
+  eval_batch_size: 64
+  epochs: 100
+  patience: 15
+  seed: 42
+models:
+  efficientat-mnv3:
+    family: CNN
+    arch: mobilenetv3_large_100
+    label: MobileNetV3-L (kiến trúc EfficientAT mn10, không có trọng số EfficientAT)
+  panns-cnn10:
+    family: CNN
+    arch: cnn10
+    label: PANNs CNN10 (kiến trúc, không có trọng số PANNs)
+    channels:
+    - 64
+    - 128
+    - 256
+    - 512
+  resnet18:
+    family: CNN
+    arch: resnet18
+    label: ResNet18
+  efficientnet-b2:
+    family: CNN
+    arch: efficientnet_b2
+    label: EfficientNet-B2
+  convnextv2-t:
+    family: CNN
+    arch: convnextv2_tiny
+    label: ConvNeXt V2-T
+  crnn-bigru:
+    family: RNN
+    arch: crnn
+    label: CRNN (3 khối conv, BiGRU 3 lớp)
+    channels:
+    - 64
+    - 128
+    - 256
+    hidden: 448
+    layers: 3
+  bilstm:
+    family: RNN
+    arch: bilstm
+    label: BiLSTM 3 lớp trên log-mel
+    hidden: 448
+    layers: 3
+    time_pool: 4
+  deit-tiny:
+    family: ViT
+    arch: deit_tiny_patch16_224
+    label: DeiT-Tiny
+  vit-s16-ced:
+    family: ViT
+    arch: vit_small_patch16_224
+    label: ViT-S/16 (kiến trúc CED-Small, không có trọng số CED)
+  mobilevit-s:
+    family: Lai
+    arch: mobilevit_s
+    label: MobileViT-S
+  conformer-m:
+    family: Lai
+    arch: conformer
+    label: Conformer-M (encoder d=256, 16 lớp, không có decoder)
+    hidden: 256
+    layers: 16
+    heads: 4
+    ffn_ratio: 4
+    kernel_size: 31
+  swin-t-htsat:
+    family: Lai
+    arch: swin_tiny_patch4_window7_224
+    label: Swin-T (backbone của HTS-AT, không có token-semantic module và trọng số
+      HTS-AT)
+    window_size:
+    - 4
+    - 6
+  efficientat-mn04:
+    family: CNN
+    arch: mobilenetv3_width
+    label: MobileNetV3-L width 0,4 (kiến trúc EfficientAT mn04, không có trọng số
+      EfficientAT)
+    width_mult: 0.4
+  efficientat-mn05:
+    family: CNN
+    arch: mobilenetv3_width
+    label: MobileNetV3-L width 0,5 (kiến trúc EfficientAT mn05, không có trọng số
+      EfficientAT)
+    width_mult: 0.5
+  efficientat-mn20:
+    family: CNN
+    arch: mobilenetv3_width
+    label: MobileNetV3-L width 2,0 (kiến trúc EfficientAT mn20, không có trọng số
+      EfficientAT)
+    width_mult: 2.0
+  ced-mini:
+    family: ViT
+    arch: vit_ced
+    label: ViT-Mini (d 256, 12 lớp, 4 head; kích thước CED-Mini, patch 16 trên 128
+      mel, không có trọng số CED)
+    hidden: 256
+    layers: 12
+    heads: 4
+    ffn_ratio: 4

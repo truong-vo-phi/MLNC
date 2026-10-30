@@ -1,0 +1,17 @@
+17:28:36 | INFO    | run beat-mv-kd-2026-10-23-17-28-36 | device cuda | RUN_TRAINING=True | qkv=True crd=True logit=True
+17:28:37 | INFO    | teacher fold 0 | epoch 1 | clean_val_accuracy 0.7402 | macro_f1 0.7110
+17:28:38 | INFO    | teacher qkv (12, 3, 2, 192, 768) | embedding (2, 768) | lưới token (8, 24)
+17:28:38 | INFO    | FRCRN best_e037_20261020T203958Z.pt | missing 0 unexpected 0
+17:28:39 | INFO    | student 45.04M tham số (transformer 42.56M) | embedding 768
+17:28:39 | INFO    | student lớp  1 (khối 1) q/k/v (3, 2, 200, 768) lưới token (8, 25) <-> BEATs lớp  1 (lưới (8, 24))
+17:28:39 | INFO    | student lớp  2 (khối 1) q/k/v (3, 2, 200, 768) lưới token (8, 25) <-> BEATs lớp  2 (lưới (8, 24))
+17:28:39 | INFO    | student lớp  3 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  3 (lưới (8, 24))
+17:28:39 | INFO    | student lớp  4 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  4 (lưới (8, 24))
+17:28:39 | INFO    | student lớp  5 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  5 (lưới (8, 24))
+17:28:39 | INFO    | student lớp  6 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  6 (lưới (8, 24))
+17:28:39 | INFO    | student lớp  7 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  7 (lưới (8, 24))
+17:28:39 | INFO    | student lớp  8 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  8 (lưới (8, 24))
+17:28:39 | INFO    | student lớp  9 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp  9 (lưới (8, 24))
+17:28:39 | INFO    | student lớp 10 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp 10 (lưới (8, 24))
+17:28:39 | INFO    | student lớp 11 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp 11 (lưới (8, 24))
+17:28:39 | INFO    | student lớp 12 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp 12 (lưới (8, 24))

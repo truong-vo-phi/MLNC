@@ -26,7 +26,6 @@ from .base import StepOutput, Trainer
 from .beat_trainer import cosine_with_warmup
 from .config import ReviewKDTrainConfig
 
-
 NINE_METRICS = (
     "top1_accuracy",
     "top3_accuracy",
@@ -155,7 +154,12 @@ class ReviewKDTrainer(Trainer):
             if self._resume_state.get("scheduler") is not None:
                 self.scheduler.load_state_dict(self._resume_state["scheduler"])
             self._resume_state = None
-            self.logger.info("%s resume: optimizer/scheduler khôi phục từ epoch %d (lr %.1e)", self.name, self._completed_epochs, self.lr)
+            self.logger.info(
+                "%s resume: optimizer/scheduler khôi phục từ epoch %d (lr %.1e)",
+                self.name,
+                self._completed_epochs,
+                self.lr,
+            )
 
     def begin_epoch(self) -> None:
         self.review.train()
@@ -219,11 +223,17 @@ class ReviewKDTrainer(Trainer):
         self._resume_state = data
         self.logger.info(
             "%s resume: từ epoch %d (best %.4f @ %d, stale %d)",
-            self.name, self._completed_epochs, self._best_score, self._best_epoch, self._resumed_stale,
+            self.name,
+            self._completed_epochs,
+            self._best_score,
+            self._best_epoch,
+            self._resumed_stale,
         )
 
     def end_epoch(self, epoch: int) -> None:
-        self._epoch_records.append({"epoch": epoch, **self._last_train, **{f"val_{k}": v for k, v in self._last_scores.items()}})
+        self._epoch_records.append(
+            {"epoch": epoch, **self._last_train, **{f"val_{k}": v for k, v in self._last_scores.items()}}
+        )
         if self.resume_path is None:
             return
         self.save_resume(self.resume_path)

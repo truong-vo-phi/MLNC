@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import torch
 from torch import Tensor, nn
-from torchaudio import transforms as T
+try:
+    from torchaudio import transforms as T
+except (ImportError, OSError):
+    T = None
 
 
 class LogMel(nn.Module):

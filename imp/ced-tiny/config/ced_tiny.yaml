@@ -1,0 +1,80 @@
+frcrn_config: config/frcrn.yaml
+
+frcrn:
+  checkpoint: pretrained/FRCRN/best_e037_20261020T203958Z.pt
+  fallback_checkpoint: pretrained/frcrn_best.pt
+  target_rms: 0.07925
+  freeze: true
+
+ced_tiny:
+  arch: deit_tiny_patch16_224
+  num_classes: 36
+  freq_bins: 64
+  frames: 398
+  init: ced-tiny
+  ced_repo: mispeech/ced-tiny
+  ced_path: null
+  dropout: 0.0
+  attn_dropout: 0.0
+  drop_path: 0.0
+  post_ln: false
+  pre_ln: true
+  bias_init: zero
+  use_bias: true
+  time_major: false
+  hybrid_pool: false
+
+frontend:
+  sample_rate: 16000
+  n_fft: 512
+  win_length: 400
+  hop_length: 160
+  n_mels: 64
+  f_min: 20.0
+  f_max: 8000.0
+  num_frames: 398
+  log_eps: 1.0e-6
+  norm_eps: 1.0e-5
+
+specaugment:
+  freq_masks: 2
+  freq_width: 8
+  time_masks: 2
+  time_width: 24
+
+data:
+  dataset_key: mixture-36l
+  duration: 4.0
+  snr_levels: [-5.0, 0.0, 5.0, 10.0, 15.0, 20.0]
+  num_workers: 4
+  balanced_sampling: true
+  max_train_samples: null
+  max_eval_samples: null
+  nhat_cache_dir: null
+  audioset_eval_segments: /marimo/datasets/audioset/AudioSet/metadata/eval_segments.csv
+  audioset_train_segments:
+    - /marimo/datasets/audioset/AudioSet/metadata/balanced_train_segments.csv
+    - /marimo/datasets/audioset/AudioSet/metadata/unbalanced_train_segments.csv
+
+train:
+  optimizer: adamw
+  lr: 0.0001
+  weight_decay: 0.01
+  betas: [0.9, 0.999]
+  warmup_steps: 500
+  scheduler: cosine
+  warmup_ratio: 0.1
+  min_lr_ratio: 0.0
+  label_smoothing: 0.05
+  mixup: 0.5
+  mixup_alpha: 0.4
+  grad_clip: 1.0
+  epochs: 15
+  patience: 7
+  batch_size: 32
+  accumulation_steps: 1
+  eval_batch_size: 64
+  amp: bf16
+  seed: 2026
+  resume_every: 1
+  selection_metric: macro_acc

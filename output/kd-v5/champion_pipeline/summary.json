@@ -1,0 +1,12 @@
+{
+  "pipeline": "Dual-Expert + 3-Way TTA + Temperature Calibration",
+  "target_achieved": true,
+  "metrics": {
+    "top1_accuracy": 0.63577,
+    "top3_accuracy": 0.80189,
+    "balanced_accuracy": 0.6203,
+    "mAP_macro": 0.70081,
+    "mAP_overall": 0.69568,
+    "macro_auc": 0.96191
+  }
+}

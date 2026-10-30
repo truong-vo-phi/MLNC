@@ -1,0 +1,155 @@
+17:45:31 | INFO    | run beat-mv-kd-2026-10-23-17-45-31 | device cuda | RUN_TRAINING=True | qkv=True crd=True logit=True
+17:45:31 | INFO    | teacher fold 0 | epoch 1 | clean_val_accuracy 0.7402 | macro_f1 0.7110
+17:45:32 | INFO    | teacher qkv (12, 3, 2, 192, 768) | embedding (2, 768) | lưới token (8, 24)
+17:45:32 | INFO    | FRCRN best_e037_20261020T203958Z.pt | missing 0 unexpected 0
+17:45:33 | INFO    | student 45.04M tham số (transformer 42.56M) | embedding 768
+17:45:33 | INFO    | student lớp  1 (khối 1) q/k/v (3, 2, 200, 768) lưới token (8, 25) <-> BEATs lớp  1 (lưới (8, 24))
+17:45:33 | INFO    | student lớp  2 (khối 1) q/k/v (3, 2, 200, 768) lưới token (8, 25) <-> BEATs lớp  2 (lưới (8, 24))
+17:45:33 | INFO    | student lớp  3 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  3 (lưới (8, 24))
+17:45:33 | INFO    | student lớp  4 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  4 (lưới (8, 24))
+17:45:33 | INFO    | student lớp  5 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  5 (lưới (8, 24))
+17:45:33 | INFO    | student lớp  6 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  6 (lưới (8, 24))
+17:45:33 | INFO    | student lớp  7 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  7 (lưới (8, 24))
+17:45:33 | INFO    | student lớp  8 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  8 (lưới (8, 24))
+17:45:33 | INFO    | student lớp  9 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp  9 (lưới (8, 24))
+17:45:33 | INFO    | student lớp 10 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp 10 (lưới (8, 24))
+17:45:33 | INFO    | student lớp 11 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp 11 (lưới (8, 24))
+17:45:33 | INFO    | student lớp 12 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp 12 (lưới (8, 24))
+17:45:58 | INFO    | FRCRN best_e037_20261020T203958Z.pt | missing 0 unexpected 0
+17:45:59 | INFO    | e2e-final-test | student 45.04M | crd 0.20M | train 30240 mẫu
+17:48:12 | INFO    | e2e-final-test epoch 1 | loss 3.2011 ce 3.2011 cos 0.9988 rel 0.3120 crd 9.6107 kl 4.1204 | train acc 0.1458 | val macro_acc 0.1912 mAP_macro 0.2089 | lr 1.00e-04
+17:48:13 | INFO    | e2e-final-test: validation tại epoch tốt nhất 1, 9 chỉ số theo SNR
+        top1_accuracy  top3_accuracy  balanced_accuracy  precision_macro  recall_macro  macro_f1  micro_f1     mAP  macro_auc
+snr_db                                                                                                                       
+-5             0.2204         0.4287             0.2204           0.2400        0.2204    0.1981    0.2204  0.2205     0.8267
+0              0.2176         0.4500             0.2176           0.2030        0.2176    0.1804    0.2176  0.2378     0.8332
+5              0.1889         0.4343             0.1889           0.1835        0.1889    0.1626    0.1889  0.2150     0.8316
+10             0.1815         0.3741             0.1815           0.1858        0.1815    0.1533    0.1815  0.1967     0.8079
+15             0.1815         0.3769             0.1815           0.2134        0.1815    0.1624    0.1815  0.1964     0.8121
+20             0.1574         0.3463             0.1574           0.1768        0.1574    0.1268    0.1574  0.1872     0.7901
+mean           0.1912         0.4017             0.1912           0.2004        0.1912    0.1639    0.1912  0.2089     0.8169
+17:48:21 | INFO    | e2e-final-test validation: 12 cặp nhầm nhiều nhất (thật -> đoán, tỉ lệ trên lớp thật)
+  Burping, eructation -> Bark: 57% (102 clip)
+  Laughter -> Bark: 43% (78 clip)
+  Chime -> Flute: 42% (75 clip)
+  Saxophone -> Trumpet: 41% (73 clip)
+  Drawer open or close -> Tearing: 37% (67 clip)
+  Clarinet -> Flute: 34% (61 clip)
+  Scissors -> Computer keyboard: 33% (60 clip)
+  Acoustic guitar -> Violin, fiddle: 32% (58 clip)
+  Fart -> Bark: 30% (54 clip)
+  Clarinet -> Trumpet: 29% (53 clip)
+  Hi-hat -> Cowbell: 28% (50 clip)
+  Cough -> Bark: 27% (49 clip)
+17:48:21 | INFO    | e2e-final-test validation: 8 lớp yếu nhất theo recall
+              label  recall  precision    AP most_confused_as  confused_rate
+              Cough   0.000      0.000 0.053             Bark          0.272
+     Microwave oven   0.000      0.000 0.096             Gong          0.267
+            Writing   0.000      0.000 0.123          Tearing          0.222
+    Finger snapping   0.006      0.031 0.048             Bark          0.217
+      Keys jangling   0.017      0.062 0.054          Tearing          0.194
+           Laughter   0.044      0.043 0.171             Bark          0.433
+Burping, eructation   0.056      0.087 0.110             Bark          0.567
+          Saxophone   0.056      0.222 0.144          Trumpet          0.406
+17:54:19 | INFO    | e2e-final-test test: 12 cặp nhầm nhiều nhất (thật -> đoán, tỉ lệ trên lớp thật)
+  Burping, eructation -> Bark: 50% (90 clip)
+  Clarinet -> Trumpet: 44% (80 clip)
+  Cough -> Bark: 42% (76 clip)
+  Laughter -> Bark: 42% (75 clip)
+  Saxophone -> Trumpet: 39% (70 clip)
+  Drawer open or close -> Tearing: 38% (69 clip)
+  Scissors -> Tearing: 36% (64 clip)
+  Tearing -> Computer keyboard: 34% (62 clip)
+  Keys jangling -> Computer keyboard: 31% (56 clip)
+  Computer keyboard -> Tearing: 31% (55 clip)
+  Acoustic guitar -> Violin, fiddle: 29% (52 clip)
+  Writing -> Tearing: 26% (47 clip)
+17:54:19 | INFO    | e2e-final-test test: 8 lớp yếu nhất theo recall
+               label  recall  precision    AP  most_confused_as  confused_rate
+      Microwave oven   0.000      0.000 0.111              Gong          0.200
+             Writing   0.000      0.000 0.085           Tearing          0.261
+               Chime   0.006      0.011 0.102             Flute          0.161
+           Saxophone   0.011      0.043 0.077           Trumpet          0.389
+     Finger snapping   0.017      0.167 0.084              Bark          0.206
+Drawer open or close   0.022      0.048 0.071           Tearing          0.383
+       Keys jangling   0.028      0.082 0.093 Computer keyboard          0.311
+    Gunshot, gunfire   0.044      0.276 0.157           Tearing          0.244
+17:54:19 | INFO    | e2e-final-test: TEST, 9 chỉ số theo SNR
+        top1_accuracy  top3_accuracy  balanced_accuracy  precision_macro  recall_macro  macro_f1  micro_f1     mAP  macro_auc
+snr_db                                                                                                                       
+-5             0.2398         0.4574             0.2398           0.2431        0.2398    0.2194    0.2398  0.2578     0.8541
+0              0.2056         0.4306             0.2056           0.2159        0.2056    0.1868    0.2056  0.2235     0.8479
+5              0.1880         0.4009             0.1880           0.2027        0.1880    0.1695    0.1880  0.2203     0.8408
+10             0.2037         0.4222             0.2037           0.1907        0.2037    0.1707    0.2037  0.2246     0.8386
+15             0.1778         0.3870             0.1778           0.1877        0.1778    0.1556    0.1778  0.1994     0.8240
+20             0.1528         0.3222             0.1528           0.1656        0.1528    0.1233    0.1528  0.1730     0.7985
+mean           0.1946         0.4034             0.1946           0.2009        0.1946    0.1709    0.1946  0.2164     0.8340
+17:54:20 | INFO    | FRCRN best_e037_20261020T203958Z.pt | missing 0 unexpected 0
+17:54:20 | INFO    | e2e-final-test | student 45.04M | crd 0.20M | train 30240 mẫu
+17:54:21 | INFO    | e2e-final-test: nối tiếp từ epoch 2 (best 0.1912 ở epoch 1, stale 0)
+17:54:21 | INFO    | e2e-final-test: validation tại epoch tốt nhất 1, 9 chỉ số theo SNR
+        top1_accuracy  top3_accuracy  balanced_accuracy  precision_macro  recall_macro  macro_f1  micro_f1     mAP  macro_auc
+snr_db                                                                                                                       
+-5             0.2204         0.4287             0.2204           0.2400        0.2204    0.1981    0.2204  0.2205     0.8267
+0              0.2176         0.4500             0.2176           0.2030        0.2176    0.1804    0.2176  0.2378     0.8332
+5              0.1889         0.4343             0.1889           0.1835        0.1889    0.1626    0.1889  0.2150     0.8316
+10             0.1815         0.3741             0.1815           0.1858        0.1815    0.1533    0.1815  0.1967     0.8079
+15             0.1815         0.3769             0.1815           0.2134        0.1815    0.1624    0.1815  0.1964     0.8121
+20             0.1574         0.3463             0.1574           0.1768        0.1574    0.1268    0.1574  0.1872     0.7901
+mean           0.1912         0.4017             0.1912           0.2004        0.1912    0.1639    0.1912  0.2089     0.8169
+17:54:29 | INFO    | e2e-final-test validation: 12 cặp nhầm nhiều nhất (thật -> đoán, tỉ lệ trên lớp thật)
+  Burping, eructation -> Bark: 57% (102 clip)
+  Laughter -> Bark: 43% (78 clip)
+  Chime -> Flute: 42% (75 clip)
+  Saxophone -> Trumpet: 41% (73 clip)
+  Drawer open or close -> Tearing: 37% (67 clip)
+  Clarinet -> Flute: 34% (61 clip)
+  Scissors -> Computer keyboard: 33% (60 clip)
+  Acoustic guitar -> Violin, fiddle: 32% (58 clip)
+  Fart -> Bark: 30% (54 clip)
+  Clarinet -> Trumpet: 29% (53 clip)
+  Hi-hat -> Cowbell: 28% (50 clip)
+  Cough -> Bark: 27% (49 clip)
+17:54:30 | INFO    | e2e-final-test validation: 8 lớp yếu nhất theo recall
+              label  recall  precision    AP most_confused_as  confused_rate
+              Cough   0.000      0.000 0.053             Bark          0.272
+     Microwave oven   0.000      0.000 0.096             Gong          0.267
+            Writing   0.000      0.000 0.123          Tearing          0.222
+    Finger snapping   0.006      0.031 0.048             Bark          0.217
+      Keys jangling   0.017      0.062 0.054          Tearing          0.194
+           Laughter   0.044      0.043 0.171             Bark          0.433
+Burping, eructation   0.056      0.087 0.110             Bark          0.567
+          Saxophone   0.056      0.222 0.144          Trumpet          0.406
+18:00:27 | INFO    | e2e-final-test test: 12 cặp nhầm nhiều nhất (thật -> đoán, tỉ lệ trên lớp thật)
+  Burping, eructation -> Bark: 50% (90 clip)
+  Clarinet -> Trumpet: 44% (80 clip)
+  Cough -> Bark: 42% (76 clip)
+  Laughter -> Bark: 42% (75 clip)
+  Saxophone -> Trumpet: 39% (70 clip)
+  Drawer open or close -> Tearing: 38% (68 clip)
+  Scissors -> Tearing: 36% (64 clip)
+  Tearing -> Computer keyboard: 34% (62 clip)
+  Keys jangling -> Computer keyboard: 31% (55 clip)
+  Computer keyboard -> Tearing: 30% (54 clip)
+  Acoustic guitar -> Violin, fiddle: 29% (52 clip)
+  Writing -> Tearing: 26% (47 clip)
+18:00:27 | INFO    | e2e-final-test test: 8 lớp yếu nhất theo recall
+               label  recall  precision    AP  most_confused_as  confused_rate
+      Microwave oven   0.000      0.000 0.111              Gong          0.200
+             Writing   0.000      0.000 0.085           Tearing          0.261
+               Chime   0.006      0.011 0.102             Flute          0.161
+           Saxophone   0.011      0.043 0.077           Trumpet          0.389
+     Finger snapping   0.017      0.143 0.084              Bark          0.206
+Drawer open or close   0.022      0.048 0.070           Tearing          0.378
+       Keys jangling   0.028      0.083 0.093 Computer keyboard          0.306
+    Gunshot, gunfire   0.033      0.214 0.157           Tearing          0.250
+18:00:27 | INFO    | e2e-final-test: TEST, 9 chỉ số theo SNR
+        top1_accuracy  top3_accuracy  balanced_accuracy  precision_macro  recall_macro  macro_f1  micro_f1     mAP  macro_auc
+snr_db                                                                                                                       
+-5             0.2389         0.4565             0.2389           0.2423        0.2389    0.2186    0.2389  0.2578     0.8541
+0              0.2065         0.4324             0.2065           0.2218        0.2065    0.1885    0.2065  0.2241     0.8479
+5              0.1880         0.4009             0.1880           0.2031        0.1880    0.1696    0.1880  0.2200     0.8408
+10             0.2046         0.4231             0.2046           0.1920        0.2046    0.1718    0.2046  0.2249     0.8386
+15             0.1787         0.3870             0.1787           0.1880        0.1787    0.1565    0.1787  0.1996     0.8240
+20             0.1528         0.3213             0.1528           0.1678        0.1528    0.1235    0.1528  0.1719     0.7985
+mean           0.1949         0.4035             0.1949           0.2025        0.1949    0.1714    0.1949  0.2164     0.8340

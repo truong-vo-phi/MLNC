@@ -1,0 +1,70 @@
+# BAN-style born-again BEATs students on Mixture-36l.
+model_config: config/beat.yaml
+
+data:
+  dataset_key: mixture-36l
+  duration: 4.0
+  snr_levels: [-5.0, 0.0, 5.0, 10.0, 15.0, 20.0]
+  num_workers: 4
+  balanced_sampling: true
+  max_train_samples: null
+  max_eval_samples: null
+  # Đường dẫn thư mục cache n̂ (train.npy/validation.npy và .done), null = tính FRCRN mỗi bước. Cần teacher.finetune true.
+  nhat_cache_dir: null
+
+teacher:
+  # finetune: true = FRCRN (frcrn_checkpoint, đóng băng) + BEATs pretrain gốc, fine-tune từ đầu trên train; checkpoint bỏ qua.
+  finetune: true
+  frcrn_checkpoint: pretrained/FRCRN/best_e037_20261020T203958Z.pt
+  # reuse: true = nạp teacher đã train có sẵn trong run (RUN_ID) và bỏ qua huấn luyện
+  reuse: false
+  # finetune: false = nạp checkpoint đã fine-tune; best.pt = FRCRN + BEATs; null = tự tìm best.pt rồi fold0.
+  checkpoint: null
+  input_rms: null
+  cache_logits: true
+  cache_dir: cache/ban-beat/teacher
+  frcrn_config: config/frcrn.yaml
+
+loss:
+  # lambda in L = (1 - lambda) * CE + lambda * KL. 0.8 is the experiment default, not a BAN-paper value.
+  kd_weight: 0.8
+  temperature: 2.0
+  confidence_weighting: false
+  confidence_power: 1.0
+  # Attention transfer trên hidden state của các layer; 0 = tắt. Loss = β/2 · trung bình theo layer (không cộng tổng).
+  attention_weight: 0.0
+  attention_layers: [4, 8, 12]
+
+train:
+  optimizer: adamw
+  lr: 5.0e-5
+  weight_decay: 0.01
+  betas: [0.9, 0.98]
+  scheduler: cosine
+  warmup_ratio: 0.1
+  min_lr_ratio: 0.0
+  label_smoothing: 0.0
+  grad_clip: 5.0
+  epochs: 100
+  patience: 15
+  batch_size: 32
+  eval_batch_size: 64
+  amp: bf16
+  seed: 42
+  resume_every: 1
+  selection_metric: macro_f1_snr
+  # plateau_factor > 0: nhân LR với giá trị này sau mỗi plateau_patience epoch không cải thiện (0 = tắt)
+  plateau_factor: 0.0
+  plateau_patience: 3
+
+generations:
+  count: 2
+  # scratch = khởi tạo ngẫu nhiên như BAN; pretrain = nạp BEATs pretrain gốc. Mỗi thế hệ chưng cất từ thế hệ trước.
+  student_init: scratch
+  ensemble: true
+  seeds: [42, 43, 44]
+
+baseline:
+  # Compute-matched no-KD seed ensemble; empty seeds = reuse generations.seeds.
+  enabled: false
+  seeds: []

@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1140 680" width="1140" height="680" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475467"/>
+    </marker>
+  </defs>
+  <rect width="1140" height="680" fill="#FFFFFF"/>
+  <text x="30" y="30" font-size="16" font-weight="600" fill="#101828">Pipeline BAN với BEATs: FRCRN → BEATs, chuỗi thế hệ</text>
+
+  <rect x="30" y="60" width="190" height="60" rx="8" fill="#F2F4F7" stroke="#475467" stroke-width="1.5"/>
+  <text x="125" y="86" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Hỗn hợp x</text>
+  <text x="125" y="106" text-anchor="middle" font-size="12" fill="#475467">16 kHz · 4 giây</text>
+
+  <rect x="255" y="60" width="190" height="60" rx="8" fill="#ECFDF3" stroke="#12B76A" stroke-width="1.5"/>
+  <text x="350" y="86" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">FRCRN e037 (mask)</text>
+  <text x="350" y="106" text-anchor="middle" font-size="12" fill="#475467">đóng băng, n̂ = x − ŝ</text>
+
+  <rect x="480" y="60" width="190" height="60" rx="8" fill="#F2F4F7" stroke="#475467" stroke-width="1.5"/>
+  <text x="575" y="86" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">RMS chuẩn hoá</text>
+  <text x="575" y="106" text-anchor="middle" font-size="12" fill="#475467">input_rms</text>
+
+  <rect x="705" y="60" width="415" height="60" rx="8" fill="#FFFFFF" stroke="#D0D5DD" stroke-width="1" stroke-dasharray="5 4"/>
+  <text x="722" y="86" font-size="12" fill="#101828">Dữ liệu mixture-36l: train để huấn luyện, validation để chọn checkpoint.</text>
+  <text x="722" y="106" font-size="12" fill="#475467">Test không tham gia pipeline.</text>
+
+  <path d="M220,90 H255" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M445,90 H480" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <path d="M575,120 V160 H125 V200" fill="none" stroke="#12B76A" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <path d="M575,160 V200" fill="none" stroke="#12B76A" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <path d="M575,160 H350 V200" fill="none" stroke="#12B76A" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <path d="M575,160 H800 V200" fill="none" stroke="#12B76A" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <path d="M575,160 H1025 V200" fill="none" stroke="#12B76A" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="640" y="152" font-size="12" fill="#12B76A">front-end dùng chung cho mọi model</text>
+
+  <rect x="30" y="200" width="190" height="130" rx="8" fill="#EEF4FF" stroke="#3538CD" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="125" y="224" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Teacher T0</text>
+  <text x="125" y="246" text-anchor="middle" font-size="12" fill="#475467">BEATs pretrain gốc</text>
+  <text x="125" y="264" text-anchor="middle" font-size="12" fill="#475467">fine-tune từ đầu trên train</text>
+  <text x="125" y="282" text-anchor="middle" font-size="12" fill="#475467">epoch chọn theo validation</text>
+  <text x="125" y="314" text-anchor="middle" font-size="12" fill="#3538CD">đóng băng sau khi train</text>
+
+  <rect x="255" y="200" width="190" height="130" rx="8" fill="#EFF8FF" stroke="#1570EF" stroke-width="1.5"/>
+  <text x="350" y="224" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Student S1 (thế hệ 1)</text>
+  <text x="350" y="246" text-anchor="middle" font-size="12" fill="#475467">BEATs khởi tạo ngẫu nhiên</text>
+  <text x="350" y="264" text-anchor="middle" font-size="12" fill="#475467">teacher = T0</text>
+  <text x="350" y="282" text-anchor="middle" font-size="12" fill="#475467">loss BAN (+ AT nếu bật)</text>
+  <text x="350" y="314" text-anchor="middle" font-size="12" fill="#1570EF">huấn luyện</text>
+
+  <rect x="480" y="200" width="190" height="130" rx="8" fill="#EEF4FF" stroke="#3538CD" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="575" y="224" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Teacher T1</text>
+  <text x="575" y="246" text-anchor="middle" font-size="12" fill="#475467">= S1 sau khi train</text>
+  <text x="575" y="264" text-anchor="middle" font-size="12" fill="#475467">checkpoint tốt nhất</text>
+  <text x="575" y="282" text-anchor="middle" font-size="12" fill="#475467">logits train tính lại</text>
+  <text x="575" y="314" text-anchor="middle" font-size="12" fill="#3538CD">đóng băng</text>
+
+  <rect x="705" y="200" width="190" height="130" rx="8" fill="#EFF8FF" stroke="#1570EF" stroke-width="1.5"/>
+  <text x="800" y="224" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Student S2 (thế hệ 2)</text>
+  <text x="800" y="246" text-anchor="middle" font-size="12" fill="#475467">BEATs khởi tạo ngẫu nhiên</text>
+  <text x="800" y="264" text-anchor="middle" font-size="12" fill="#475467">teacher = T1</text>
+  <text x="800" y="282" text-anchor="middle" font-size="12" fill="#475467">loss BAN (+ AT nếu bật)</text>
+  <text x="800" y="314" text-anchor="middle" font-size="12" fill="#1570EF">huấn luyện</text>
+
+  <rect x="930" y="200" width="190" height="130" rx="8" fill="#F9F5FF" stroke="#7F56D9" stroke-width="1.5"/>
+  <text x="1025" y="224" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Đánh giá</text>
+  <text x="1025" y="246" text-anchor="middle" font-size="12" fill="#475467">9 metric × 6 SNR + all</text>
+  <text x="1025" y="264" text-anchor="middle" font-size="12" fill="#475467">S1, S2 và BANE</text>
+  <text x="1025" y="282" text-anchor="middle" font-size="12" fill="#475467">BANE = trung bình softmax</text>
+  <text x="1025" y="314" text-anchor="middle" font-size="12" fill="#7F56D9">test chỉ dùng ở bước này</text>
+
+  <path d="M220,265 H255" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M445,265 H480" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M670,265 H705" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M895,265 H930" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="30" y="360" width="1090" height="110" rx="8" fill="#FFFAEB" stroke="#B54708" stroke-width="1.5"/>
+  <text x="50" y="386" font-size="14" font-weight="600" fill="#101828">Hàm mất mát thế hệ k: student S_k học từ teacher T_(k−1) và nhãn y</text>
+  <text x="50" y="414" font-size="14" fill="#101828">L_k = (1 − λ)·CE(y, p_s) + λ·T²·KL(p_t ‖ p_s) + (β/2)·mean_l ‖â_s,l − â_t,l‖²</text>
+  <text x="50" y="440" font-size="12" fill="#475467">λ = 0,8 · T = 2 · β = 1000 (AT trên layer 4, 8, 12, đang tắt mặc định) · p_t = softmax(z_t / T) từ logits cache trên train</text>
+  <text x="50" y="458" font-size="12" fill="#475467">Chuỗi: T0 → S1 → T1 → S2. Mỗi thế hệ khởi tạo ngẫu nhiên và chọn checkpoint theo macro_f1_snr trên validation.</text>
+
+  <rect x="30" y="490" width="1090" height="46" rx="8" fill="#ECFDF3" stroke="#12B76A" stroke-width="1.5"/>
+  <text x="50" y="518" font-size="13" fill="#101828">Front-end FRCRN e037 đóng băng dùng chung cho teacher và student. Teacher và student luôn nhìn cùng một đầu vào n̂.</text>
+
+  <rect x="30" y="550" width="1090" height="46" rx="8" fill="#F2F4F7" stroke="#475467" stroke-width="1"/>
+  <text x="50" y="578" font-size="13" fill="#101828">Dữ liệu huấn luyện: mixture-36l (train, validation). BEATs pretrain gốc: BEATs_iter3_plus_AS2M.pt, không có đầu phân loại.</text>
+
+  <rect x="30" y="620" width="26" height="16" rx="3" fill="#EEF4FF" stroke="#3538CD" stroke-dasharray="4 3"/>
+  <text x="64" y="634" font-size="12" fill="#475467">đóng băng</text>
+  <rect x="160" y="620" width="26" height="16" rx="3" fill="#EFF8FF" stroke="#1570EF"/>
+  <text x="194" y="634" font-size="12" fill="#475467">huấn luyện</text>
+  <rect x="290" y="620" width="26" height="16" rx="3" fill="#FFFAEB" stroke="#B54708"/>
+  <text x="324" y="634" font-size="12" fill="#475467">loss</text>
+  <rect x="380" y="620" width="26" height="16" rx="3" fill="#ECFDF3" stroke="#12B76A"/>
+  <text x="414" y="634" font-size="12" fill="#475467">front-end</text>
+  <rect x="500" y="620" width="26" height="16" rx="3" fill="#F9F5FF" stroke="#7F56D9"/>
+  <text x="534" y="634" font-size="12" fill="#475467">đầu ra</text>
+</svg>

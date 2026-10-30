@@ -1,0 +1,2 @@
+17:03:56 | INFO    | run beat-mv-kd-2026-10-23-17-03-56 | device cuda | RUN_TRAINING=True | qkv=True crd=True logit=True
+17:04:29 | INFO    | drive: bật, thư mục FA26_Capstone/Truong/beat-mv-kd-v3

@@ -248,3 +248,18 @@ def test_build_dataset_registers_vlsp(tmp_path, monkeypatch):
     dataset = build_dataset(VLSP_KEY, "train", split_ratios={"train": 1.0})
     assert isinstance(dataset, VLSPDataset)
     assert len(dataset) == 1
+
+
+def test_mixture_sample_ids_file_filters_rows(tmp_path):
+    (tmp_path / "labels.txt").write_text("A\nB\n", encoding="utf-8")
+    (tmp_path / "validation").mkdir()
+    header = "sample_id,mixture_path,multi_hot_36,target_snr_db"
+    rows = [f"validation_{i},validation/mixture/{i}.wav,\"[1,0]\",{snr}" for i, snr in enumerate((0.0, 5.0, 0.0, 5.0))]
+    (tmp_path / "validation" / "manifest.csv").write_text("\n".join([header, *rows]) + "\n", encoding="utf-8")
+    (tmp_path / "clean.csv").write_text("sample_id,noise_ytid\nvalidation_1,a\nvalidation_2,b\n", encoding="utf-8")
+    kwargs = {"root": tmp_path, "split": "validation"}
+    assert len(Mixture36Dataset(**kwargs)) == 4
+    filtered = Mixture36Dataset(**kwargs, sample_ids_file=tmp_path / "clean.csv")
+    assert [row["sample_id"] for row in filtered.rows] == ["validation_1", "validation_2"]
+    both = Mixture36Dataset(**kwargs, sample_ids_file=tmp_path / "clean.csv", snr_db=(5.0,))
+    assert [row["sample_id"] for row in both.rows] == ["validation_1"]

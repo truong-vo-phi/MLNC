@@ -1,0 +1,9 @@
+2026-10-17 03:37:32,234 | INFO | validation samples: 6480
+2026-10-17 03:37:39,748 | INFO | validation samples: 6480
+2026-10-17 03:38:50,800 | INFO | validation samples: 6480
+2026-10-17 03:50:48,555 | INFO | validation samples: 6480
+2026-10-17 04:00:24,961 | INFO | cnn10-reviewkd (checkpoint epoch 19): review_weight 1.0000 best_epoch 19.0000 macro_acc 0.4377 top1_accuracy 0.4377 top3_accuracy 0.6122 balanced_accuracy 0.4377 precision_macro 0.4814 recall_macro 0.4377 macro_f1 0.4361 micro_f1 0.4377 mAP 0.4576 macro_auc 0.8905
+2026-10-17 04:00:24,962 | INFO | cnn10-reviewkd eval seconds: 576.4
+2026-10-17 04:08:57,654 | INFO | cnn10-ce (checkpoint epoch 28): review_weight 0.0000 best_epoch 28.0000 macro_acc 0.4262 top1_accuracy 0.4262 top3_accuracy 0.6106 balanced_accuracy 0.4262 precision_macro 0.4781 recall_macro 0.4262 macro_f1 0.4233 micro_f1 0.4262 mAP 0.4464 macro_auc 0.8826
+2026-10-17 04:08:57,656 | INFO | cnn10-ce eval seconds: 512.7
+2026-10-17 04:08:57,658 | INFO | written D:\PROJECT\MLNC\output\result\reviewkd-2026-10-16-11-11-12\result.csv

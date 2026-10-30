@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1140 660" width="1140" height="660" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475467"/>
+    </marker>
+  </defs>
+  <rect width="1140" height="660" fill="#FFFFFF"/>
+  <text x="30" y="30" font-size="16" font-weight="600" fill="#101828">KD: BEATs fine-tune (teacher) → CED-Tiny (student), cùng đầu vào n̂</text>
+
+  <rect x="30" y="55" width="200" height="60" rx="8" fill="#F2F4F7" stroke="#475467" stroke-width="1.5"/>
+  <text x="130" y="81" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">n̂ từ cache</text>
+  <text x="130" y="101" text-anchor="middle" font-size="12" fill="#475467">FRCRN residual đã tính trước</text>
+
+  <rect x="270" y="55" width="200" height="60" rx="8" fill="#F2F4F7" stroke="#475467" stroke-width="1.5"/>
+  <text x="370" y="81" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">RMS chuẩn hoá</text>
+  <text x="370" y="101" text-anchor="middle" font-size="12" fill="#475467">input_rms = 0.07925</text>
+
+  <rect x="510" y="55" width="200" height="60" rx="8" fill="#F2F4F7" stroke="#475467" stroke-width="1.5"/>
+  <text x="610" y="81" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Mixup</text>
+  <text x="610" y="101" text-anchor="middle" font-size="12" fill="#475467">p = 0,8 · Beta(0,4) trên n̂ và nhãn</text>
+
+  <rect x="750" y="55" width="360" height="60" rx="8" fill="#FFFFFF" stroke="#D0D5DD" stroke-width="1" stroke-dasharray="5 4"/>
+  <text x="768" y="81" font-size="12" fill="#101828">Dataset mixture-36l: train để huấn luyện, validation để chọn epoch.</text>
+  <text x="768" y="101" font-size="12" fill="#475467">Test chỉ đọc ở bước eval, không tham gia train.</text>
+
+  <path d="M230,85 H270" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M470,85 H510" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <path d="M610,115 V142 H195 V168" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M610,142 H565 V168" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="622" y="137" font-size="12" fill="#475467">cùng một đầu vào</text>
+
+  <rect x="30" y="168" width="330" height="160" rx="8" fill="#EEF4FF" stroke="#3538CD" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="195" y="192" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Teacher: BEATs fine-tune fold0</text>
+  <text x="195" y="214" text-anchor="middle" font-size="12" fill="#475467">12 khối · 768 chiều · 12 head</text>
+  <text x="195" y="234" text-anchor="middle" font-size="12" fill="#475467">Mel 128 · patch 16 × 16 → 24 × 8 = 192 token</text>
+  <text x="195" y="254" text-anchor="middle" font-size="12" fill="#475467">Đầu ra: logits · hidden (layer 4, 8, 12)</text>
+  <text x="195" y="274" text-anchor="middle" font-size="12" fill="#475467">Cache scale và position bias (layer 1–12)</text>
+  <text x="195" y="304" text-anchor="middle" font-size="12" fill="#3538CD">đóng băng, không cập nhật trọng số</text>
+
+  <rect x="400" y="168" width="330" height="160" rx="8" fill="#EFF8FF" stroke="#1570EF" stroke-width="1.5"/>
+  <text x="565" y="192" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Student: CED-Tiny (DeiT-Tiny)</text>
+  <text x="565" y="214" text-anchor="middle" font-size="12" fill="#475467">Log-mel 64 mel × 398 khung · SpecAugment</text>
+  <text x="565" y="234" text-anchor="middle" font-size="12" fill="#475467">Patch 16 × 16 → 4 × 24 = 96 token + CLS</text>
+  <text x="565" y="254" text-anchor="middle" font-size="12" fill="#475467">12 khối · 192 chiều · 3 head</text>
+  <text x="565" y="274" text-anchor="middle" font-size="12" fill="#475467">Đầu ra: logits · hidden · cache bias</text>
+  <text x="565" y="304" text-anchor="middle" font-size="12" fill="#1570EF">huấn luyện, dropout = 0</text>
+
+  <rect x="760" y="168" width="350" height="160" rx="8" fill="#F9F5FF" stroke="#7F56D9" stroke-width="1.5"/>
+  <text x="935" y="192" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Gộp để so khớp</text>
+  <text x="778" y="216" font-size="12" fill="#475467">Tần số: teacher 8 → student 4 (trung bình cặp)</text>
+  <text x="778" y="236" font-size="12" fill="#475467">Thời gian: 24 khung, giữ nguyên</text>
+  <text x="778" y="256" font-size="12" fill="#475467">Head: teacher 12 → student 3 (trung bình nhóm 4)</text>
+  <text x="778" y="276" font-size="12" fill="#475467">CLS của student bị bỏ trước khi so</text>
+  <text x="778" y="296" font-size="12" fill="#475467">Teacher và student cùng thứ tự time-major</text>
+
+  <text x="570" y="352" text-anchor="middle" font-size="12" fill="#475467">Logits, hidden và cache của teacher và student cùng đi vào bốn số hạng dưới đây.</text>
+
+  <rect x="30" y="366" width="255" height="100" rx="8" fill="#FFFAEB" stroke="#B54708" stroke-width="1.5"/>
+  <text x="157" y="392" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">CE nhãn mềm</text>
+  <text x="157" y="414" text-anchor="middle" font-size="12" fill="#475467">label smoothing 0,1</text>
+  <text x="157" y="434" text-anchor="middle" font-size="12" fill="#475467">student so với nhãn đã mixup</text>
+
+  <rect x="305" y="366" width="255" height="100" rx="8" fill="#FFFAEB" stroke="#B54708" stroke-width="1.5"/>
+  <text x="432" y="392" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Logit KD</text>
+  <text x="432" y="414" text-anchor="middle" font-size="12" fill="#475467">KL(p_t ‖ p_s), T = 4</text>
+  <text x="432" y="434" text-anchor="middle" font-size="12" fill="#475467">weight 1,0</text>
+
+  <rect x="580" y="366" width="255" height="100" rx="8" fill="#FFFAEB" stroke="#B54708" stroke-width="1.5"/>
+  <text x="707" y="392" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Attention transfer</text>
+  <text x="707" y="414" text-anchor="middle" font-size="12" fill="#475467">energy token, chuẩn hoá L2</text>
+  <text x="707" y="434" text-anchor="middle" font-size="12" fill="#475467">β = 1000 · layer 4, 8, 12</text>
+
+  <rect x="855" y="366" width="255" height="100" rx="8" fill="#FFFAEB" stroke="#B54708" stroke-width="1.5"/>
+  <text x="982" y="392" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">BEATs bias</text>
+  <text x="982" y="414" text-anchor="middle" font-size="12" fill="#475467">scale GRU + position bias</text>
+  <text x="982" y="434" text-anchor="middle" font-size="12" fill="#475467">layer 1–12 · weight 1,0 mỗi phần</text>
+
+  <rect x="30" y="486" width="1080" height="62" rx="8" fill="#FFFAEB" stroke="#B54708" stroke-width="1.5"/>
+  <text x="50" y="510" font-size="14" font-weight="600" fill="#101828">L = CE + w_KD · T² · KL(p_t ‖ p_s) + β · L_AT + w_scale · L_scale + w_pos · L_pos</text>
+  <text x="50" y="532" font-size="12" fill="#475467">Mặc định: w_KD = 1,0, T = 4, β = 1000, w_scale = w_pos = 1,0. AT và bias chỉ tính khi bật trong mục attention của config.</text>
+
+  <rect x="30" y="566" width="1080" height="46" rx="8" fill="#ECFDF3" stroke="#12B76A" stroke-width="1.5"/>
+  <text x="50" y="594" font-size="13" fill="#101828">Chọn epoch theo score = macro_acc − 0,2 × gap (train_eval, validation). Early stop sau 7 epoch. Test chỉ ở bước eval.</text>
+
+  <rect x="30" y="626" width="26" height="16" rx="3" fill="#EEF4FF" stroke="#3538CD" stroke-dasharray="4 3"/>
+  <text x="64" y="640" font-size="12" fill="#475467">đóng băng</text>
+  <rect x="160" y="626" width="26" height="16" rx="3" fill="#EFF8FF" stroke="#1570EF"/>
+  <text x="194" y="640" font-size="12" fill="#475467">huấn luyện</text>
+  <rect x="290" y="626" width="26" height="16" rx="3" fill="#FFFAEB" stroke="#B54708"/>
+  <text x="324" y="640" font-size="12" fill="#475467">loss</text>
+  <rect x="380" y="626" width="26" height="16" rx="3" fill="#F9F5FF" stroke="#7F56D9"/>
+  <text x="414" y="640" font-size="12" fill="#475467">gộp, so khớp</text>
+</svg>

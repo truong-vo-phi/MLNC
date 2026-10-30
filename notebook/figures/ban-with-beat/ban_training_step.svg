@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 420" width="1000" height="420" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475467"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="420" fill="#FFFFFF"/>
+  <text x="20" y="30" font-size="16" font-weight="600" fill="#101828">Một bước huấn luyện student (một thế hệ)</text>
+
+  <rect x="20" y="160" width="160" height="80" rx="8" fill="#F2F4F7" stroke="#475467" stroke-width="1.5"/>
+  <text x="100" y="192" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Batch</text>
+  <text x="100" y="214" text-anchor="middle" font-size="12" fill="#475467">mixture, y, sample_id</text>
+
+  <rect x="220" y="160" width="160" height="80" rx="8" fill="#ECFDF3" stroke="#12B76A" stroke-width="1.5"/>
+  <text x="300" y="192" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Front-end</text>
+  <text x="300" y="214" text-anchor="middle" font-size="12" fill="#475467">FRCRN + RMS (đóng băng)</text>
+
+  <rect x="430" y="60" width="220" height="70" rx="8" fill="#EEF4FF" stroke="#3538CD" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="540" y="88" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Teacher BEATs</text>
+  <text x="540" y="110" text-anchor="middle" font-size="12" fill="#475467">z_t, cache theo sample_id</text>
+
+  <rect x="430" y="250" width="220" height="70" rx="8" fill="#EFF8FF" stroke="#1570EF" stroke-width="1.5"/>
+  <text x="540" y="278" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Student BEATs</text>
+  <text x="540" y="300" text-anchor="middle" font-size="12" fill="#475467">z_s, có gradient</text>
+
+  <rect x="690" y="160" width="280" height="80" rx="8" fill="#FFFAEB" stroke="#B54708" stroke-width="1.5"/>
+  <text x="830" y="188" text-anchor="middle" font-size="14" font-weight="600" fill="#101828">Hàm mất mát BAN</text>
+  <text x="830" y="210" text-anchor="middle" font-size="12" fill="#101828">(1 − λ)·CE(y, p_s) + λ·T²·KL(p_t ‖ p_s)</text>
+
+  <rect x="690" y="320" width="280" height="60" rx="8" fill="#EFF8FF" stroke="#1570EF" stroke-width="1.5"/>
+  <text x="830" y="346" text-anchor="middle" font-size="13" font-weight="600" fill="#101828">AdamW cập nhật student</text>
+  <text x="830" y="366" text-anchor="middle" font-size="12" fill="#475467">teacher và FRCRN không nhận gradient</text>
+
+  <path d="M180,200 H220" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M380,190 H400 V95 H430" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M380,230 H400 V285 H430" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M650,95 H830 V160" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M650,285 H760 V240" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M900,240 V320" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <text x="20" y="400" font-size="12" fill="#475467">Front-end chạy với no_grad. Với teacher, z_t lấy từ cache khi dataset cố định và không augment.</text>
+</svg>

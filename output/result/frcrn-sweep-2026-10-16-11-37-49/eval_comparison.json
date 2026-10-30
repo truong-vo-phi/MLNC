@@ -1,0 +1,203 @@
+{
+ "note": "SI-SNR cua nhieu (dB), target speech (nhieu = mixture - speech_estimate). Chep tu ket qua danh gia tren molab (phien da het han); file goc compare_prev.json/compare_groups.json khong con.",
+ "checkpoints": {
+  "original_SE16K": "pretrained/last_best_checkpoint.pt (alibabasglab/FRCRN_SE_16K)",
+  "previous_best_pt": "pretrained/FRCRN/best.pt = frcrn_best.pt = Drive FA26_Capstone/Truong/FRCRN/best.pt, md5 e52285d9475c795e26b6a6c420998601",
+  "drive_FRCRN_vlsp": "Drive FA26_Capstone/Truong/FRCRN_vlsp/best.pt, md5 0e9b2789c9e38e6dce1ccf4d377bad4e (checkpoint khac, sua ngay 2026-10-08)",
+  "new_best_pt": "pretrained/finetune/frcrn/frcrn_mix36_sweepbest_e9_best.pt, md5 1d28bfd9e0657f7859484c79f58075f1 (epoch 9)"
+ },
+ "val_1200_samples": {
+  "original_SE16K": {
+   "noise_si_snr_by_snr": {
+    "-5": 9.757,
+    "0": 7.283,
+    "5": 6.545,
+    "10": 2.873,
+    "15": -0.518,
+    "20": -4.86
+   },
+   "noise_si_snr_hi_15_20": -2.689,
+   "noise_si_snr_mean": 3.512
+  },
+  "previous_best_pt": {
+   "noise_si_snr_by_snr": {
+    "-5": 13.81,
+    "0": 10.831,
+    "5": 9.455,
+    "10": 6.5,
+    "15": 3.655,
+    "20": 0.437
+   },
+   "noise_si_snr_hi_15_20": 2.046,
+   "noise_si_snr_mean": 7.448
+  },
+  "drive_FRCRN_vlsp": {
+   "noise_si_snr_by_snr": {
+    "-5": 13.387,
+    "0": 10.652,
+    "5": 9.506,
+    "10": 6.47,
+    "15": 3.522,
+    "20": 0.265
+   },
+   "noise_si_snr_hi_15_20": 1.893,
+   "noise_si_snr_mean": 7.3
+  },
+  "new_best_pt": {
+   "noise_si_snr_by_snr": {
+    "-5": 10.151,
+    "0": 8.204,
+    "5": 7.548,
+    "10": 4.787,
+    "15": 2.056,
+    "20": -1.922
+   },
+   "noise_si_snr_hi_15_20": 0.067,
+   "noise_si_snr_mean": 5.136
+  }
+ },
+ "test_full_6480": {
+  "original_SE16K": {
+   "noise_si_snr_by_snr": {
+    "-5": 9.141,
+    "0": 7.0,
+    "5": 5.372,
+    "10": 2.987,
+    "15": -1.479,
+    "20": -4.458
+   },
+   "noise_si_snr_hi_15_20": -2.969,
+   "noise_si_snr_mean": 3.094
+  },
+  "previous_best_pt": {
+   "noise_si_snr_by_snr": {
+    "-5": 13.794,
+    "0": 11.059,
+    "5": 8.708,
+    "10": 6.432,
+    "15": 3.31,
+    "20": 0.595
+   },
+   "noise_si_snr_hi_15_20": 1.953,
+   "noise_si_snr_mean": 7.316
+  },
+  "drive_FRCRN_vlsp": {
+   "noise_si_snr_by_snr": {
+    "-5": 13.29,
+    "0": 10.85,
+    "5": 8.512,
+    "10": 6.209,
+    "15": 3.21,
+    "20": 0.373
+   },
+   "noise_si_snr_hi_15_20": 1.792,
+   "noise_si_snr_mean": 7.074
+  },
+  "new_best_pt": {
+   "noise_si_snr_by_snr": {
+    "-5": 9.72,
+    "0": 8.136,
+    "5": 6.732,
+    "10": 4.83,
+    "15": 1.316,
+    "20": -1.457
+   },
+   "noise_si_snr_hi_15_20": -0.07,
+   "noise_si_snr_mean": 4.88
+  }
+ },
+ "test_by_noise_source_split": {
+  "audioset_train_noise_1200_rows": {
+   "original_SE16K": {
+    "noise_si_snr_by_snr": {
+     "-5": 8.452,
+     "0": 7.573,
+     "5": 5.874,
+     "10": 3.196,
+     "15": -0.64,
+     "20": -4.362
+    },
+    "noise_si_snr_hi_15_20": -2.501,
+    "noise_si_snr_mean": 3.322
+   },
+   "previous_best_pt": {
+    "noise_si_snr_by_snr": {
+     "-5": 13.698,
+     "0": 11.133,
+     "5": 9.105,
+     "10": 6.3,
+     "15": 3.388,
+     "20": 0.629
+    },
+    "noise_si_snr_hi_15_20": 2.008,
+    "noise_si_snr_mean": 7.303
+   },
+   "new_best_pt": {
+    "noise_si_snr_by_snr": {
+     "-5": 8.928,
+     "0": 7.959,
+     "5": 6.905,
+     "10": 4.86,
+     "15": 1.713,
+     "20": -1.689
+    },
+    "noise_si_snr_hi_15_20": 0.012,
+    "noise_si_snr_mean": 4.763
+   }
+  },
+  "audioset_validation_noise_1357_rows": {
+   "original_SE16K": {
+    "noise_si_snr_by_snr": {
+     "-5": 8.991,
+     "0": 5.88,
+     "5": 4.319,
+     "10": 2.237,
+     "15": -2.289,
+     "20": -3.856
+    },
+    "noise_si_snr_hi_15_20": -3.073,
+    "noise_si_snr_mean": 2.553
+   },
+   "previous_best_pt": {
+    "noise_si_snr_by_snr": {
+     "-5": 13.925,
+     "0": 10.8,
+     "5": 8.63,
+     "10": 6.356,
+     "15": 3.956,
+     "20": 1.201
+    },
+    "noise_si_snr_hi_15_20": 2.578,
+    "noise_si_snr_mean": 7.475
+   },
+   "new_best_pt": {
+    "noise_si_snr_by_snr": {
+     "-5": 9.871,
+     "0": 7.515,
+     "5": 6.138,
+     "10": 4.589,
+     "15": 1.41,
+     "20": -0.9
+    },
+    "noise_si_snr_hi_15_20": 0.255,
+    "noise_si_snr_mean": 4.776
+   }
+  }
+ },
+ "noise_clip_overlap_mix_vs_audioset": {
+  "audioset_40l_splits_copied": {
+   "train": 3424,
+   "validation": 833
+  },
+  "mix_splits_distinct_noise_clips": {
+   "train": 2692,
+   "validation": 579,
+   "test": 574
+  },
+  "mix_split_noise_overlap_between_splits": 0,
+  "mix_test_noise_clips_by_audioset_split": {
+   "train": 463,
+   "validation": 111
+  }
+ }
+}

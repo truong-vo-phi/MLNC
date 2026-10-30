@@ -1,0 +1,73 @@
+# ==============================================================================
+# Cấu hình Champion Pipeline: Dual-Expert & Dual-Teacher Mixture of Experts (MoE)
+# ==============================================================================
+
+pipeline:
+  name: "champion-dual-expert"
+  snr_threshold_db: 18.0     # Ngưỡng định tuyến năng lượng SNR (dB): < 18 dB là Low-SNR, >= 18 dB là High-SNR
+  temp_student: 1.40         # Hệ số nhiệt độ T_student: làm mềm phân phối xác suất của Student nhỏ
+  temp_teacher: 1.20         # Hệ số nhiệt độ T_teacher: giữ độ sắc nét và tin cậy của Teachers lớn
+  tta_shift_samples: 800     # Độ dịch thời gian cho 3-Way TTA (+/- 800 mẫu ở 16kHz tương đương +/- 50ms)
+  input_rms: 0.07925         # Mức RMS biên độ chuẩn hóa đầu vào trước khi qua mạng nơ-ron
+  
+  # Tuyến Low-SNR (< 18 dB): Môi trường nhiễu nặng, Fold0 và Low-Student phát huy sức mạnh
+  low_expert:
+    student_weight: 0.30     # Trọng số S1: CED-Tiny Low-Student
+    teacher_fold0_weight: 0.45 # Trọng số T1: BEATs Teacher Fold0 (đóng vai trò trụ cột)
+    teacher_ema_weight: 0.25   # Trọng số T2: BEATs Teacher EMA
+    
+  # Tuyến High-SNR (>= 18 dB): Âm thanh rõ, Teacher EMA và High-Student vượt trội
+  high_expert:
+    student_weight: 0.35     # Trọng số S2: CED-Tiny High-Student (fine-tuned 20 dB)
+    teacher_ema_weight: 0.40   # Trọng số T2: BEATs Teacher EMA (lọc tinh xảo)
+    teacher_fold0_weight: 0.25 # Trọng số T1: BEATs Teacher Fold0
+
+checkpoints:
+  low_student: /marimo/output/kd-v5/checkpoint/kd-ced-tiny-2026-10-29-18-20-51/student/last_best_checkpoint.pt
+  high_student: /marimo/output/high_expert/last_best_checkpoint.pt
+  teacher_fold0: /marimo/pretrained/beats_teacher_fold0_weights.pt
+  teacher_ema: /marimo/pretrained/beats_teacher_ema_standalone.pt
+
+dataset:
+  name: mixture-36l          # Bộ dữ liệu âm thanh 36 lớp trong môi trường nhiễu
+  duration: 4.0              # Thời lượng mỗi clip âm thanh (4.0 giây = 64,000 mẫu ở 16kHz)
+  data_root: /marimo/dataset/mix-dataset-v2
+  cache_dir: /marimo/dataset/cache
+  split: validation
+  batch_size: 64
+
+frontend:
+  sample_rate: 16000         # Tần số lấy mẫu âm thanh chuẩn 16 kHz
+  n_fft: 512                 # Kích thước biến đổi Fourier nhanh (STFT)
+  win_length: 400            # Độ dài cửa sổ phân tích (25 ms)
+  hop_length: 160            # Bước nhảy cửa sổ (10 ms)
+  n_mels: 64                 # Số lượng dải lọc Mel (64 bins tần số)
+  f_min: 20.0                # Tần số giới hạn dưới (Hz)
+  f_max: 8000.0              # Tần số giới hạn trên (Hz)
+  num_frames: 398            # Số khung thời gian cắt chuẩn
+  log_eps: 1.0e-6
+  norm_eps: 1.0e-5
+
+specaugment:
+  freq_masks: 2              # Số lượng mặt nạ tần số
+  freq_width: 8              # Độ rộng tối đa mỗi mặt nạ tần số
+  time_masks: 2              # Số lượng mặt nạ thời gian
+  time_width: 24             # Độ rộng tối đa mỗi mặt nạ thời gian
+
+student:
+  arch: deit_tiny_patch16_224 # Khung kiến trúc Vision Transformer nền tảng
+  num_classes: 36            # Số lớp phân loại âm thanh
+  freq_bins: 64              # Số bins tần số đầu vào
+  frames: 398                # Số frames thời gian đầu vào
+  init: ced-tiny             # Khởi tạo từ trọng số mispeech/ced-tiny trên HuggingFace
+  ced_repo: mispeech/ced-tiny
+  ced_path: null
+  dropout: 0.0
+  attn_dropout: 0.0
+  drop_path: 0.0
+  post_ln: false
+  pre_ln: true
+  bias_init: zero            # Khởi tạo bảng Relative Bias bằng 0
+
+teacher:
+  config: config/beat.yaml   # Cấu hình kiến trúc Teacher BEATs 12L (90.34M tham số)

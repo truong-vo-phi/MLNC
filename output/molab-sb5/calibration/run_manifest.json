@@ -1,0 +1,9 @@
+{
+  "git_commit": "89a59614cb97a9fb57ed41a2dddb86b9c80cd264",
+  "checkpoint": "output\\molab-sb5\\checkpoint\\beat-mv-kd-2026-10-23-18-00-32\\mobilevit12-ffn768-lr1e-04-do30-dp10-wd10-frcrn-mx50-qkv-crd-logit\\last_best_checkpoint.pt",
+  "checkpoint_md5": "17f54a93fd0d2239241172f276673146",
+  "input": "log(xac suat float16 da luu) thay logit",
+  "feature_config": "FRONTEND log-mel 128, n^ cua FRCRN best_e037, student MobileViT 12 lop",
+  "date": "2026-10-25",
+  "seed": 0
+}

@@ -1,0 +1,8 @@
+split,snr_db,top1_accuracy,top3_accuracy,balanced_accuracy,precision_macro,recall_macro,macro_f1,micro_f1,mAP,macro_auc,macro_acc,mAP_macro,acc,score,gap
+synthetic,overall,0.25,0.75,0.25,0.0625,0.25,0.1,0.25,1.0,1.0,0.25,1.0,0.25,0.25,0.0
+synthetic,-5,0.0,1.0,0.0,0.0,0.0,0.0,0.0,1.0,nan,,,,0.25,
+synthetic,0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,nan,,,,0.25,
+synthetic,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,nan,,,,0.25,
+synthetic,10,0.0,1.0,0.0,0.0,0.0,0.0,0.0,1.0,nan,,,,0.25,
+synthetic,15,,,,,,,,,,,,,0.25,
+synthetic,20,,,,,,,,,,,,,0.25,

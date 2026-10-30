@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="1000" height="620" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475467"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="620" fill="#FFFFFF"/>
+
+  <rect x="40" y="20" width="460" height="52" rx="8" fill="#F2F4F7" stroke="#475467" stroke-width="1.5"/>
+  <text x="270" y="42" text-anchor="middle" font-size="13" font-weight="600" fill="#101828">Hỗn hợp đã chuẩn hoá (waveform 16 kHz)</text>
+  <text x="270" y="60" text-anchor="middle" font-size="12" fill="#475467">(B, 64 000)</text>
+
+  <rect x="40" y="90" width="460" height="52" rx="8" fill="#EFF8FF" stroke="#1570EF" stroke-width="1.5"/>
+  <text x="270" y="112" text-anchor="middle" font-size="13" font-weight="600" fill="#101828">Fbank log-mel: 128 băng, khung 25 ms, bước 10 ms</text>
+  <text x="270" y="130" text-anchor="middle" font-size="12" fill="#475467">(B, ≈400, 128); chuẩn hoá (x − 15,42) / (2 × 6,56)</text>
+
+  <rect x="40" y="160" width="460" height="52" rx="8" fill="#EFF8FF" stroke="#1570EF" stroke-width="1.5"/>
+  <text x="270" y="182" text-anchor="middle" font-size="13" font-weight="600" fill="#101828">Patch embedding: Conv2d 16×16, stride 16, không bias</text>
+  <text x="270" y="200" text-anchor="middle" font-size="12" fill="#475467">(B, ≈200, 512): ≈25 khung thời gian × 8 băng tần</text>
+
+  <rect x="40" y="230" width="460" height="52" rx="8" fill="#EFF8FF" stroke="#1570EF" stroke-width="1.5"/>
+  <text x="270" y="252" text-anchor="middle" font-size="13" font-weight="600" fill="#101828">LayerNorm → Linear 512 → 768</text>
+  <text x="270" y="270" text-anchor="middle" font-size="12" fill="#475467">chiếu lên chiều encoder</text>
+
+  <rect x="40" y="300" width="460" height="52" rx="8" fill="#EFF8FF" stroke="#1570EF" stroke-width="1.5"/>
+  <text x="270" y="322" text-anchor="middle" font-size="13" font-weight="600" fill="#101828">Tích chập vị trí + GELU, cộng residual, LayerNorm</text>
+  <text x="270" y="340" text-anchor="middle" font-size="12" fill="#475467">mã hoá vị trí cục bộ trong chuỗi token</text>
+
+  <rect x="40" y="370" width="460" height="52" rx="8" fill="#EFF8FF" stroke="#1570EF" stroke-width="1.5"/>
+  <text x="270" y="392" text-anchor="middle" font-size="13" font-weight="600" fill="#101828">12 khối Transformer: attention 12 đầu, FFN 768 → 3072 → 768</text>
+  <text x="270" y="410" text-anchor="middle" font-size="12" fill="#475467">gated relative position bias, residual</text>
+
+  <rect x="40" y="440" width="460" height="52" rx="8" fill="#EFF8FF" stroke="#1570EF" stroke-width="1.5"/>
+  <text x="270" y="462" text-anchor="middle" font-size="13" font-weight="600" fill="#101828">Mean pooling theo token → Dropout 0,1</text>
+  <text x="270" y="480" text-anchor="middle" font-size="12" fill="#475467">trung bình ≈200 token → vector 768 (không dùng token CLS)</text>
+
+  <rect x="40" y="510" width="460" height="52" rx="8" fill="#F9F5FF" stroke="#7F56D9" stroke-width="1.5"/>
+  <text x="270" y="532" text-anchor="middle" font-size="13" font-weight="600" fill="#101828">Linear 768 → 36 lớp → logits</text>
+  <text x="270" y="550" text-anchor="middle" font-size="12" fill="#475467">xác suất = softmax(logits)</text>
+
+  <path d="M270,72 V90" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M270,142 V160" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M270,212 V230" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M270,282 V300" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M270,352 V370" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M270,422 V440" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M270,492 V510" fill="none" stroke="#475467" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <text x="530" y="46" font-size="12" fill="#475467">Đầu vào: đầu ra FRCRN sau RMS</text>
+  <text x="530" y="116" font-size="12" fill="#475467">Chuỗi khung: tương tự log-mel khi pretrain AudioSet</text>
+  <text x="530" y="186" font-size="12" fill="#475467">Tokens = (T/16) × (128/16) ≈ 200 với 4 giây</text>
+  <text x="530" y="256" font-size="12" fill="#475467">Chiều encoder 768 (cấu hình config/beat.yaml)</text>
+  <text x="530" y="326" font-size="12" fill="#475467">Vị trí tương đối, không cần thêm embedding cố định</text>
+  <text x="530" y="396" font-size="12" fill="#475467">Cấu hình base: 12 lớp, 12 đầu, FFN 3072</text>
+  <text x="530" y="466" font-size="12" fill="#475467">Khác tài liệu BAN (mục 3): đây là mean pooling, không phải CLS</text>
+  <text x="530" y="536" font-size="12" fill="#475467">Head chỉ có 768 × 36 tham số + bias</text>
+</svg>

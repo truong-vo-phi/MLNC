@@ -1,0 +1,53 @@
+# Configuration for Student-Teacher BEATs with Exponential Moving Average (EMA)
+model_config: config/beat.yaml
+
+data:
+  dataset_key: mixture-36l
+  cache_nhat_dir: dataset/cache
+  audioset_dir: /marimo/datasets/audioset/AudioSet
+  duration: 4.0
+  snr_levels: [-5.0, 0.0, 5.0, 10.0, 15.0, 20.0]
+  num_workers: 4
+  balanced_sampling: true
+  max_train_samples: null
+  max_eval_samples: null
+
+ema:
+  decay: 0.9995
+  warmup_steps: 0
+  warmup_decay_start: 0.90
+  update_interval: 1
+  cpu_offload: false
+  evaluate_ema: true
+  selection_target: ema  # 'ema': select best epoch by Teacher EMA; 'model': by student
+  kd_weight: 1.0
+  temperature: 4.0
+  crd_weight: 0.8
+  crd_dim: 128
+  crd_negatives: 4096
+  crd_temperature: 0.07
+  crd_momentum: 0.5
+  crd_num_samples: 30240
+
+train:
+  optimizer: adamw
+  lr: 0.0001
+  layer_decay: 0.3
+  min_lr: 1.0e-6
+  weight_decay: 0.01
+  betas: [0.9, 0.98]
+  scheduler: plateau  # 'plateau', 'cosine', or 'warmup_cosine'
+  warmup_ratio: 0.1
+  min_lr_ratio: 0.0
+  label_smoothing: 0.0
+  grad_clip: 5.0
+  epochs: 25
+  patience: 5  # Early stopping patience
+  plateau_factor: 0.5  # Reduce LR by 50% on plateau
+  plateau_patience: 2  # After 2 stale epochs
+  batch_size: 32
+  eval_batch_size: 64
+  amp: bf16
+  seed: 42
+  resume_every: 1
+  selection_metric: macro_f1

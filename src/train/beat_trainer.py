@@ -78,6 +78,13 @@ class BEATTrainer(Trainer):
     def num_classes(self) -> int:
         return self.model.config.num_classes
 
+    def on_no_improvement(self, epoch: int, stale: int) -> None:
+        config = self.config
+        if not getattr(config, "plateau_factor", 0.0) or self.scheduler is None or stale % config.plateau_patience:
+            return
+        self.scheduler.base_lrs = [lr * config.plateau_factor for lr in self.scheduler.base_lrs]
+        self.logger.info("%s: lr x%.2f sau %d epoch không cải thiện", self.name, config.plateau_factor, stale)
+
     def configure_optimizer(self, steps_per_epoch: int) -> None:
         self.optimizer = AdamW(
             self.trainable_parameters,

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import torch
 from torch import Tensor, nn
-from torchaudio.models import Conformer
+try:
+    from torchaudio.models import Conformer
+except (ImportError, OSError):
+    Conformer = object
 
 from .config import BaselineConfig
 

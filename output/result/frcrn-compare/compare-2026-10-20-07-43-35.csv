@@ -1,0 +1,5 @@
+system,acc,acc_snr_-5,macro_acc,noise_sisnr_db,sisnr_snr_-5
+mixture_only (không FRCRN),0.2500,0.2500,0.2500,nan,nan
+noise_oracle (nhiễu sạch),0.2500,0.2500,0.2500,nan,nan
+frcrn_best (target=speech),0.2500,0.2500,0.2500,13.6890,13.6890
+frcrn_best_v2 (target=noise),0.2778,0.2778,0.2778,12.0978,12.0978

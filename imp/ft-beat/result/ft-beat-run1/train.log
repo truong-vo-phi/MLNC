@@ -1,0 +1,13 @@
+10:38:54 | INFO    | Starting ft-beat pipeline | run_id=ft-beat-2026-10-29-10-38-54 | device=cuda | smoke=False
+10:38:55 | INFO    | Data loaded: train=30240, val=3064
+10:38:55 | INFO    | Using cached nhat: dataset/cache
+10:38:55 | INFO    | Loading BEATs checkpoint: /marimo/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt
+10:40:30 | INFO    | [beats_frcrn] epoch 1/10 | train train_loss 1.690 acc 0.596 mAP 0.640 | val top1_accuracy 0.498 top3_accuracy 0.667 balanced_accuracy 0.478 precision_macro 0.522 recall_macro 0.478 macro_f1 0.465 micro_f1 0.498 mAP 0.507 macro_auc 0.904 | best 0.465 @ 1 | stale 0/4
+10:42:03 | INFO    | [beats_frcrn] epoch 2/10 | train train_loss 0.350 acc 0.909 mAP 0.960 | val top1_accuracy 0.497 top3_accuracy 0.667 balanced_accuracy 0.482 precision_macro 0.513 recall_macro 0.482 macro_f1 0.479 micro_f1 0.497 mAP 0.494 macro_auc 0.887 | best 0.479 @ 2 | stale 0/4
+10:43:35 | INFO    | [beats_frcrn] epoch 3/10 | train train_loss 0.150 acc 0.960 mAP 0.990 | val top1_accuracy 0.504 top3_accuracy 0.678 balanced_accuracy 0.491 precision_macro 0.499 recall_macro 0.491 macro_f1 0.473 micro_f1 0.504 mAP 0.511 macro_auc 0.882 | best 0.479 @ 2 | stale 1/4
+10:45:07 | INFO    | [beats_frcrn] epoch 4/10 | train train_loss 0.077 acc 0.979 mAP 0.997 | val top1_accuracy 0.483 top3_accuracy 0.666 balanced_accuracy 0.461 precision_macro 0.503 recall_macro 0.461 macro_f1 0.449 micro_f1 0.483 mAP 0.470 macro_auc 0.875 | best 0.479 @ 2 | stale 2/4
+10:46:38 | INFO    | [beats_frcrn] epoch 5/10 | train train_loss 0.040 acc 0.990 mAP 0.999 | val top1_accuracy 0.499 top3_accuracy 0.665 balanced_accuracy 0.480 precision_macro 0.498 recall_macro 0.480 macro_f1 0.465 micro_f1 0.499 mAP 0.516 macro_auc 0.881 | best 0.479 @ 2 | stale 3/4
+10:48:09 | INFO    | [beats_frcrn] epoch 6/10 | train train_loss 0.018 acc 0.995 mAP 1.000 | val top1_accuracy 0.510 top3_accuracy 0.672 balanced_accuracy 0.487 precision_macro 0.496 recall_macro 0.487 macro_f1 0.478 micro_f1 0.510 mAP 0.505 macro_auc 0.874 | best 0.479 @ 2 | stale 4/4
+10:48:09 | INFO    | beats_frcrn early stop at epoch 6
+10:48:09 | INFO    | Running evaluation on validation set
+10:48:12 | INFO    | Pipeline complete. Results saved to output/result/ft-beat-2026-10-29-10-38-54

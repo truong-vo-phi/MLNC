@@ -1,0 +1,36 @@
+11:54:53 | INFO    | run beat-mv-kd-2026-10-23-11-54-53 | device cuda | RUN_TRAINING=True | qkv=True crd=True logit=False
+11:54:53 | INFO    | teacher fold 0 | epoch 1 | clean_val_accuracy 0.7402 | macro_f1 0.7110
+11:54:54 | INFO    | teacher qkv (12, 3, 2, 192, 768) | embedding (2, 768) | lưới token (8, 24)
+11:54:54 | INFO    | FRCRN best_e037_20261020T203958Z.pt | missing 0 unexpected 0
+11:54:55 | INFO    | student 45.04M tham số (transformer 42.56M) | embedding 768
+11:54:55 | INFO    | student lớp  1 (khối 1) q/k/v (3, 2, 200, 768) lưới token (8, 25) <-> BEATs lớp  1 (lưới (8, 24))
+11:54:55 | INFO    | student lớp  2 (khối 1) q/k/v (3, 2, 200, 768) lưới token (8, 25) <-> BEATs lớp  2 (lưới (8, 24))
+11:54:55 | INFO    | student lớp  3 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  3 (lưới (8, 24))
+11:54:55 | INFO    | student lớp  4 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  4 (lưới (8, 24))
+11:54:55 | INFO    | student lớp  5 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  5 (lưới (8, 24))
+11:54:55 | INFO    | student lớp  6 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  6 (lưới (8, 24))
+11:54:55 | INFO    | student lớp  7 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  7 (lưới (8, 24))
+11:54:55 | INFO    | student lớp  8 (khối 2) q/k/v (3, 2, 52, 768) lưới token (4, 13) <-> BEATs lớp  8 (lưới (8, 24))
+11:54:55 | INFO    | student lớp  9 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp  9 (lưới (8, 24))
+11:54:55 | INFO    | student lớp 10 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp 10 (lưới (8, 24))
+11:54:55 | INFO    | student lớp 11 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp 11 (lưới (8, 24))
+11:54:55 | INFO    | student lớp 12 (khối 3) q/k/v (3, 2, 14, 768) lưới token (2, 7) <-> BEATs lớp 12 (lưới (8, 24))
+11:54:58 | INFO    | FRCRN best_e037_20261020T203958Z.pt | missing 0 unexpected 0
+11:54:58 | INFO    | mobilevit12-ffn768-frcrn-qkv-crd | student 45.04M | crd 0.20M | train 30240 mẫu
+11:54:59 | INFO    | mobilevit12-ffn768-frcrn-qkv-crd: nối tiếp từ epoch 2 (best 0.2262 ở epoch 1, stale 0)
+12:13:03 | INFO    | mobilevit12-ffn768-frcrn-qkv-crd epoch 2 | loss 2.9113 ce 2.5665 cos 0.6071 rel 0.2698 crd 1.6941 kl 0.0000 | train acc 0.3395 | val macro_acc 0.2924 mAP_macro 0.3179
+12:13:13 | INFO    | drive backup: /marimo/output/result/beat-mv-kd-2026-10-23-11-54-53/history_mobilevit12-ffn768-frcrn-qkv-crd.csv -> FA26_Capstone/Truong/beat-mv-kd/mobilevit12-ffn768-frcrn-qkv-crd/history_mobilevit12-ffn768-frcrn-qkv-crd.csv
+12:13:23 | INFO    | drive: epoch 2 (0.292) -> FA26_Capstone/Truong/beat-mv-kd/mobilevit12-ffn768-frcrn-qkv-crd/best.pt
+12:14:21 | INFO    | drive backup: /marimo/output/resume/mobilevit12-ffn768-frcrn-qkv-crd/resume.pt -> FA26_Capstone/Truong/beat-mv-kd/mobilevit12-ffn768-frcrn-qkv-crd/resume.pt
+12:32:23 | INFO    | mobilevit12-ffn768-frcrn-qkv-crd epoch 3 | loss 2.7572 ce 2.1547 cos 0.5312 rel 0.2472 crd 1.4559 kl 0.0000 | train acc 0.4815 | val macro_acc 0.2951 mAP_macro 0.3220
+12:32:32 | INFO    | drive backup: /marimo/output/result/beat-mv-kd-2026-10-23-11-54-53/history_mobilevit12-ffn768-frcrn-qkv-crd.csv -> FA26_Capstone/Truong/beat-mv-kd/mobilevit12-ffn768-frcrn-qkv-crd/history_mobilevit12-ffn768-frcrn-qkv-crd.csv
+12:32:43 | INFO    | drive: epoch 3 (0.295) -> FA26_Capstone/Truong/beat-mv-kd/mobilevit12-ffn768-frcrn-qkv-crd/best.pt
+12:33:15 | INFO    | drive backup: /marimo/output/resume/mobilevit12-ffn768-frcrn-qkv-crd/resume.pt -> FA26_Capstone/Truong/beat-mv-kd/mobilevit12-ffn768-frcrn-qkv-crd/resume.pt
+12:51:12 | INFO    | mobilevit12-ffn768-frcrn-qkv-crd epoch 4 | loss 2.5170 ce 1.7698 cos 0.4942 rel 0.1953 crd 1.1118 kl 0.0000 | train acc 0.6235 | val macro_acc 0.3196 mAP_macro 0.3281
+12:52:04 | WARNING | drive backup failed for /marimo/output/result/beat-mv-kd-2026-10-23-11-54-53/history_mobilevit12-ffn768-frcrn-qkv-crd.csv: MultipleFilesError('FA26_Capstone/Truong/beat-mv-kd')
+12:52:55 | WARNING | drive: upload failed at epoch 4: MultipleFilesError('FA26_Capstone/Truong/beat-mv-kd')
+12:53:47 | WARNING | drive backup failed for /marimo/output/resume/mobilevit12-ffn768-frcrn-qkv-crd/resume.pt: MultipleFilesError('FA26_Capstone/Truong/beat-mv-kd')
+13:12:08 | INFO    | mobilevit12-ffn768-frcrn-qkv-crd epoch 5 | loss 2.4718 ce 1.4842 cos 0.4600 rel 0.1592 crd 1.2306 kl 0.0000 | train acc 0.7371 | val macro_acc 0.3329 mAP_macro 0.3259
+13:12:59 | WARNING | drive backup failed for /marimo/output/result/beat-mv-kd-2026-10-23-11-54-53/history_mobilevit12-ffn768-frcrn-qkv-crd.csv: MultipleFilesError('FA26_Capstone/Truong/beat-mv-kd')
+13:13:51 | WARNING | drive: upload failed at epoch 5: MultipleFilesError('FA26_Capstone/Truong/beat-mv-kd')
+13:14:42 | WARNING | drive backup failed for /marimo/output/resume/mobilevit12-ffn768-frcrn-qkv-crd/resume.pt: MultipleFilesError('FA26_Capstone/Truong/beat-mv-kd')

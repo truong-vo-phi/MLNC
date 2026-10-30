@@ -1,0 +1,36 @@
+{
+  "args": {
+    "train_per_class": 1,
+    "test_per_class": 1,
+    "batch_size": 6,
+    "probe_batches": 1,
+    "workers": 0,
+    "threads": 8
+  },
+  "results": {
+    "mixture_only (không FRCRN)": {
+      "acc": 0.25,
+      "macro_acc": 0.25,
+      "acc_snr_-5": 0.25
+    },
+    "noise_oracle (nhiễu sạch)": {
+      "acc": 0.25,
+      "macro_acc": 0.25,
+      "acc_snr_-5": 0.25
+    },
+    "frcrn_best (target=speech)": {
+      "acc": 0.25,
+      "macro_acc": 0.25,
+      "acc_snr_-5": 0.25,
+      "noise_sisnr_db": 13.689043998718262,
+      "sisnr_snr_-5": 13.689043998718262
+    },
+    "frcrn_best_v2 (target=noise)": {
+      "acc": 0.2777777777777778,
+      "macro_acc": 0.2777777777777778,
+      "acc_snr_-5": 0.2777777777777778,
+      "noise_sisnr_db": 12.097818374633789,
+      "sisnr_snr_-5": 12.097818374633789
+    }
+  }
+}
