@@ -1,4 +1,5 @@
-# Cấu hình chung cho toàn bộ dự án Review-3
+# Cấu hình chia sẻ KD. Mặc định phía trên theo ViT lai KD-MoE S unified.
+# Các backbone khác phải dùng kd_profiles trong models.yaml và JSON/YAML gốc.
 dataset:
   name: mixture-36l
   data_root: D:\content\mix-dataset
@@ -6,14 +7,7 @@ dataset:
   sample_rate: 16000
   num_classes: 36
   snr_levels: [-5.0, 0.0, 5.0, 10.0, 15.0, 20.0]
-  num_workers: 2
-
-# Tác vụ 2: Cấu hình nạp cache npy sau khi qua mask FRCRN
-noise_cache:
-  cache_dir: "cache/nhat"
-  cache_file: null  # Đường dẫn cụ thể tới file .npy (ví dụ: validation.npy)
-  apply_rms_norm: true
-  target_rms: 0.07925
+  num_workers: 4
 
 frontend:
   sample_rate: 16000
@@ -23,7 +17,7 @@ frontend:
   n_mels: 128
   f_min: 20.0
   f_max: 8000.0
-  num_frames: 398
+  num_frames: 384
   log_eps: 1.0e-6
   norm_eps: 1.0e-5
   specaug_freq_masks: 2
@@ -32,34 +26,41 @@ frontend:
   specaug_time_width: 24
 
 training:
-  epochs: 30
-  batch_size: 32
+  epochs: 50
+  stage1_epochs: 8
+  batch_size: 64
   eval_batch_size: 64
-  lr: 3.0e-4
+  lr: 5.0e-4  # ViT lai; xem models.yaml cho PANNs/mn10/CED
   weight_decay: 0.05
   betas: [0.9, 0.999]
-  warmup_epochs: 2
-  min_lr_ratio: 0.01
+  warmup_ratio: 0.05
+  min_lr: 1.0e-6
   label_smoothing: 0.1
   grad_clip: 1.0
-  patience: 7
-  seed: 42
+  patience: 8
+  seed: 2026
+  optimizer: AdamW
+  scheduler: cosine
+  ema_decay: 0.999
+  amp: bf16
   device: auto  # 'cuda', 'cpu', hoặc 'auto'
 
 logging:
   log_dir: logs
   checkpoint_dir: checkpoints
   save_best: true
-  metric_for_best: macro_f1
+  metric_for_best: macro_acc
+  validation_subset: clean
+  expected_validation_samples: 3064
 
 # Hồ sơ tái lập các thí nghiệm KD 21–27/10/2026.
-# Giữ cấu hình Review-3 phía trên; section này là manifest chia sẻ, chưa được
-# runner Review-3 tự động áp dụng. Runner KD dùng JSON + YAML gốc bên dưới.
+# Đây là manifest chia sẻ; runner KD dùng JSON + YAML gốc bên dưới.
+# Hai file này chưa phải đầu vào thay thế trực tiếp cho runner KD.
 # Đường dẫn tương đối tính từ thư mục chứa file này. Sao chép cả thư mục config/unified.
 kd_experiments:
   schema_version: 1
   source_dir: SNR_Aware/FRCRN_KD_MoE/config/unified
-  usage: "Chọn train_*.json trong source_dir; sửa paths theo máy, chạy online_pipeline.py theo CLI của dự án KD. JSON ghi đè YAML."
+  usage: "Chọn train_*.json trong source_dir; sửa paths theo máy; dùng entry point main.py của dự án KD. JSON ghi đè YAML."
   local_paths_to_set: [dataset, frcrn_checkpoint, teacher_cache, frcrn_cache_dir, output]
   optional_feature_paths: [teacher_hints, teacher_review, teacher_pooled]
   dataset:
@@ -81,6 +82,25 @@ kd_experiments:
     crossfit_folds: 5
     train_targets: out_of_fold
     feature_dim: 768
+    source_config: teacher.json
+    trainable_transformer_blocks: 12
+    frozen_backbone_parts: [patch_embedding, input_layer_norm, post_extract_proj, encoder_parameters_outside_blocks]
+    train_classifier_head: true
+    frozen_during_student_training: true
+    finetune_epochs: 30  # Teacher riêng; 50 epoch phía trên là student stage 2
+    encoder_lr: 3.0e-5
+    head_lr: 3.0e-5
+    layer_decay: 0.2
+    patience: 5
+    weight_decay: 0.01
+    betas: [0.9, 0.98]
+    warmup_fraction: 0.1
+    gradient_clip_norm: 5.0
+    dropout: 0.0
+    layerdrop: 0.1
+    batch_size: 64
+    augmentation: {spec_ratio: 0.2, roll: true}
+    note: "Thông số teacher riêng, không kế thừa training của student."
   training:
     optimizer: AdamW
     betas: [0.9, 0.999]

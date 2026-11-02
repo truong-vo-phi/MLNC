@@ -12,6 +12,23 @@ import torch
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score
 
 
+def compute_macro_acc(probs: np.ndarray, targets: np.ndarray, snrs: np.ndarray) -> float:
+    """Group checkpoint selection: mean Balanced Accuracy over six SNR slices."""
+    y = np.asarray(targets)
+    if y.ndim == 2:
+        y = y.argmax(-1)
+    predicted = np.asarray(probs).argmax(-1)
+    snrs = np.asarray(snrs).ravel()
+    values = []
+    for snr in (-5, 0, 5, 10, 15, 20):
+        mask = np.isclose(snrs, snr)
+        if not mask.any():
+            raise ValueError(f"Missing validation SNR {snr}")
+        truth, guesses = y[mask], predicted[mask]
+        values.append(np.mean([np.mean(guesses[truth == c] == c) for c in np.unique(truth)]))
+    return float(np.mean(values))
+
+
 def _to_numpy(x: Any) -> np.ndarray:
     if isinstance(x, torch.Tensor):
         return x.detach().cpu().numpy()

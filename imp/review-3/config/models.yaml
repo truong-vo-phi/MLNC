@@ -1,22 +1,23 @@
-# Danh sách và cấu hình chi tiết cho 9 mô hình trong Review-3
-# models là registry Review-3 hiện tại. kd_profiles phía dưới là hồ sơ thí nghiệm
-# riêng, không đồng nhất vit_s với ViT lai KD-MoE S; không tự áp dụng vào registry.
-
+# Existing Review-3 registry retained; group profiles and user LR choices below.
 models:
   pann_cnn10:
     name: pann_cnn10
-    display_name: "PANN-CNN 10"
+    display_name: PANN-CNN 10
     family: CNN
     module: src.models.pann_cnn10
-    channels: [64, 128, 256, 512]
+    channels:
+    - 64
+    - 128
+    - 256
+    - 512
     dropout: 0.2
     n_mels: 128
     num_frames: 398
-    description: "4-stage Convolutional Neural Network from PANNs with AvgPool and Dual Pooling Head"
-
+    description: 4-stage Convolutional Neural Network from PANNs with AvgPool and
+      Dual Pooling Head
   ced_tiny:
     name: ced_tiny
-    display_name: "CED-Tiny"
+    display_name: CED-Tiny
     family: Audio-Transformer
     module: src.models.ced_tiny
     hidden_dim: 192
@@ -27,11 +28,11 @@ models:
     dropout: 0.0
     n_mels: 64
     num_frames: 398
-    description: "Compact 12-layer Vision Transformer with 2D Gated Relative Position Bias (AudioSet Pretrained spec)"
-
+    description: Compact 12-layer Vision Transformer with 2D Gated Relative Position
+      Bias (AudioSet Pretrained spec)
   ced_mini:
     name: ced_mini
-    display_name: "CED-Mini"
+    display_name: CED-Mini
     family: Audio-Transformer
     module: src.models.ced_mini
     hidden_dim: 256
@@ -42,11 +43,11 @@ models:
     dropout: 0.0
     n_mels: 64
     num_frames: 398
-    description: "Mid-size 12-layer Audio Transformer (D=256, H=4) with 2D Relative Position Bias"
-
+    description: Mid-size 12-layer Audio Transformer (D=256, H=4) with 2D Relative
+      Position Bias
   ced_small:
     name: ced_small
-    display_name: "CED-Small"
+    display_name: CED-Small
     family: Audio-Transformer
     module: src.models.ced_small
     hidden_dim: 384
@@ -57,11 +58,11 @@ models:
     dropout: 0.0
     n_mels: 64
     num_frames: 398
-    description: "Full-capacity 12-layer Audio Transformer (D=384, H=6) with 2D Relative Position Bias"
-
+    description: Full-capacity 12-layer Audio Transformer (D=384, H=6) with 2D Relative
+      Position Bias
   efficient_mn10:
     name: efficient_mn10
-    display_name: "Efficient-mn10"
+    display_name: Efficient-mn10
     family: CNN
     module: src.models.efficient_mn10
     arch: mobilenetv3_large_100
@@ -69,11 +70,10 @@ models:
     dropout: 0.2
     n_mels: 128
     num_frames: 398
-    description: "MobileNetV3-Large 1.0 backbone following EfficientAT mn10 specification"
-
+    description: MobileNetV3-Large 1.0 backbone following EfficientAT mn10 specification
   vit_s:
     name: vit_s
-    display_name: "ViT-S"
+    display_name: ViT-S
     family: Vision-Transformer
     module: src.models.vit_s
     hidden_dim: 384
@@ -84,33 +84,33 @@ models:
     dropout: 0.1
     n_mels: 128
     num_frames: 398
-    description: "Standard Vision Transformer Small (DeiT-S / ViT-S/16) with 1D learnable position embeddings"
-
+    description: Standard Vision Transformer Small (DeiT-S / ViT-S/16) with 1D learnable
+      position embeddings
   mobilevit:
     name: mobilevit
-    display_name: "MobileViT"
+    display_name: MobileViT
     family: Hybrid
     module: src.models.mobilevit
     arch: mobilevit_s
     dropout: 0.1
     n_mels: 128
     num_frames: 398
-    description: "Hybrid architecture merging MobileNet inverted residuals with light Transformer blocks"
-
+    description: Hybrid architecture merging MobileNet inverted residuals with light
+      Transformer blocks
   mobilenet:
     name: mobilenet
-    display_name: "MobileNet"
+    display_name: MobileNet
     family: CNN
     module: src.models.mobilenet
     arch: mobilenetv3_large_100
     dropout: 0.2
     n_mels: 128
     num_frames: 398
-    description: "Standard MobileNetV3 architecture optimized for low-latency mobile inference"
-
+    description: Standard MobileNetV3 architecture optimized for low-latency mobile
+      inference
   beats:
     name: beats
-    display_name: "BEATs"
+    display_name: BEATs
     family: Audio-Transformer
     module: src.models.beats
     hidden_dim: 768
@@ -121,15 +121,14 @@ models:
     dropout: 0.1
     n_mels: 128
     num_frames: 398
-    description: "Large-scale BEATs Audio Transformer with DeepNorm and 2D Gated Relative Position Bias"
-
-# Dùng cùng kd_experiments trong config.yaml; cấu hình gốc là nguồn thực thi.
+    description: Large-scale BEATs Audio Transformer with DeepNorm and 2D Gated Relative
+      Position Bias
 kd_profiles:
   source_dir: SNR_Aware/FRCRN_KD_MoE/config/unified
   hybrid_kdmoe_s:
     source_yaml: kdmoe_s_kd.yaml
     source_json: train_vit_kd.json
-    lr: 5.0e-4
+    lr: 0.0005
     weight_decay: 0.05
     warmup_ratio: 0.05
     kd_temperature: 2.0
@@ -139,55 +138,117 @@ kd_profiles:
     heads: 4
     n_hybrid: 2
     n_vit: 2
-    frontend: {n_mels: 128, num_frames: 384}
-    specaugment: {freq_masks: 2, freq_width: 16, time_masks: 2, time_width: 24}
+    frontend:
+      n_mels: 128
+      num_frames: 384
+    specaugment:
+      freq_masks: 2
+      freq_width: 16
+      time_masks: 2
+      time_width: 24
   panns_cnn10:
     source_yaml: kdmoe_panns_cnn10.yaml
     source_json: train_panns.json
-    lr: 1.0e-4
+    lr: 0.0001
     weight_decay: 0.05
     warmup_ratio: 0.05
     kd_temperature: 2.0
-    frontend: {n_mels: 64, num_frames: 400}
-    specaugment: {freq_masks: 2, freq_width: 8, time_masks: 2, time_width: 64}
+    frontend:
+      n_mels: 64
+      num_frames: 400
+    specaugment:
+      freq_masks: 2
+      freq_width: 8
+      time_masks: 2
+      time_width: 64
     hint_student_block: 3
-    review_student_blocks: [1, 2, 3, 4]
+    at_student_blocks:
+    - 3
+    - 4
+    review_student_blocks:
+    - 1
+    - 2
+    - 3
+    - 4
   efficientat_mn10:
     source_yaml: kdmoe_mn10.yaml
     source_json: train_mn10.json
     variant: mn10_as
     repo_commit: a425fdc
-    lr: 6.0e-5
+    lr: 6.0e-05
     weight_decay: 0.05
     warmup_ratio: 0.05
     kd_temperature: 2.0
-    frontend: {n_mels: 128, num_frames: 384}
-    specaugment: {freq_masks: 0, time_masks: 0}
+    frontend:
+      n_mels: 128
+      num_frames: 384
+    specaugment:
+      freq_masks: 0
+      time_masks: 0
     hint_student_stage: 12
-    review_student_stages: [3, 6, 12, 16]
+    at_student_stages:
+    - 12
+    - 16
+    review_student_stages:
+    - 3
+    - 6
+    - 12
+    - 16
   ced_meanpool:
-    source_yaml_pattern: kdmoe_ced_{size}_meanpool_{method}.yaml
+    source_yamls:
+      ced_tiny: kdmoe_ced_tiny_meanpool_kd.yaml
+      ced_mini: kdmoe_ced_mini_meanpool_kd.yaml
+      ced_small: kdmoe_ced_meanpool_kd.yaml
     source_json_example: train_ced_tiny_meanpool_kd_t4.json
-    variants: [ced_tiny, ced_mini, ced_small]
+    variants:
+    - ced_tiny
+    - ced_mini
+    - ced_small
     repo_commit: 4b2149d
     pooling: mean
-    lr: 1.0e-4
+    lr: 0.0001
     weight_decay: 0.01
     warmup_ratio: 0.1
     layer_decay: 0.3
     drop_path: 0.1
     kd_temperature: 4.0
-    frontend: {n_mels: 64, num_frames: 400}
-    specaugment: {freq_masks: 1, freq_width: 12, time_masks: 1, time_width: 80}
-    note: "Tên CED-Small trong file gốc dùng ced_meanpool, không phải ced_small_meanpool. Dùng source_json để xác định YAML chính xác."
-  snr_moe_common:
-    applies_to: [panns_cnn10, efficientat_mn10, ced_meanpool]
-    num_groups: 3
-    snr_band_edges: [5.0, 15.0]
-    expert_hidden: 256
-    router_hidden: 64
-    dropout: 0.1
-    inference_mode: weighted
-    use_gate: true
-    gate_eps: 0.05
-    gate_bias_init: 2.0
+    frontend:
+      n_mels: 64
+      num_frames: 400
+    specaugment:
+      freq_masks: 1
+      freq_width: 12
+      time_masks: 1
+      time_width: 80
+    note: Tên CED-Small trong file gốc dùng ced_meanpool, không phải ced_small_meanpool.
+      Dùng source_json để xác định YAML chính xác.
+ce_only_benchmark:
+  models:
+  - pann_cnn10
+  - ced_tiny
+  - ced_mini
+  - ced_small
+  - efficient_mn10
+  - vit_s
+  - mobilevit
+  - mobilenet
+  - beats
+  input: raw mixture v2
+  pretrained_policy: unchanged Review-3 constructors; no added weights or external
+    adapters
+  missing_profile_lr:
+    vit_s:
+      backbone: 3.0e-05
+      head: 0.0003
+    mobilevit:
+      backbone: 3.0e-05
+      head: 0.0003
+    mobilenet:
+      backbone: 3.0e-05
+      head: 0.0003
+    beats:
+      backbone: 1.0e-05
+      head: 0.0001
+  selection: mean present-class recall (Balanced Accuracy) across six SNRs
+  stage1_epochs: 0
+  stage1_reason: 'CE-only: no KD/front/router stages'

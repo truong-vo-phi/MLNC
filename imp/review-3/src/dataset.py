@@ -64,6 +64,7 @@ class MixtureDataset(Dataset):
         num_classes: int = 36,
         snr_levels: Sequence[float] = SNR_LEVELS,
         max_samples: int | None = None,
+        waveform_cache: str | Path | None = None,
     ) -> None:
         self.root = Path(root)
         self.split = split
@@ -90,6 +91,23 @@ class MixtureDataset(Dataset):
             rows = rows[:max_samples]
 
         self.rows = rows
+        self._waveform_array = None
+        self.waveform_cache = None
+        if waveform_cache is not None:
+            directory = Path(waveform_cache)
+            cache_split = "eval" if split in ("eval", "val", "validation") else split
+            provenance = json.loads((directory / "provenance.json").read_text(encoding="utf-8"))
+            import hashlib
+            actual = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+            if provenance["manifest_sha256"][cache_split] != actual:
+                raise ValueError("Raw mixture cache manifest hash mismatch")
+            if provenance["metadata"][cache_split]["ids"] != [row["sample_id"] for row in rows]:
+                raise ValueError("Raw mixture cache sample order mismatch")
+            self.waveform_cache = directory / f"{cache_split}_mixture.npy"
+            array = np.load(self.waveform_cache, mmap_mode="r")
+            if array.shape != (len(rows), self.num_samples):
+                raise ValueError("Invalid raw mixture cache shape")
+            del array
 
         # Load class names if present
         labels_path = self.root / "labels.txt"
@@ -102,14 +120,18 @@ class MixtureDataset(Dataset):
     def __len__(self) -> int:
         return len(self.rows)
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state["_waveform_array"] = None
+        return state
+
     def _read_audio(self, path: Path) -> Tensor:
         if not path.is_file():
             path = self.root / path
         data, sr = sf.read(str(path), dtype="float32", always_2d=True)
         waveform = data[:, 0]  # Mono
         if sr != self.sample_rate:
-            # Simple linear resample if rate differs
-            pass
+            raise ValueError(f"Expected {self.sample_rate} Hz, found {sr}: {path}")
         wave_t = torch.from_numpy(waveform)
         if len(wave_t) < self.num_samples:
             wave_t = torch.nn.functional.pad(wave_t, (0, self.num_samples - len(wave_t)))
@@ -119,8 +141,15 @@ class MixtureDataset(Dataset):
 
     def __getitem__(self, index: int) -> AudioItem:
         row = self.rows[index]
-        audio_path = Path(row.get("mixture_path", row.get("path", "")))
-        waveform = self._read_audio(audio_path)
+        if self.waveform_cache is not None:
+            if self._waveform_array is None:
+                self._waveform_array = np.load(self.waveform_cache, mmap_mode="r")
+            waveform = torch.from_numpy(self._waveform_array[index].copy())
+        else:
+            disk_split = "eval" if self.split in ("eval", "val", "validation") else self.split
+            canonical = self.root / disk_split / "mixture" / (row["sample_id"] + ".wav")
+            audio_path = canonical if canonical.is_file() else Path(row.get("mixture_path", row.get("path", "")))
+            waveform = self._read_audio(audio_path)
 
         if "multi_hot_36" in row:
             target_vec = torch.tensor(json.loads(row["multi_hot_36"]), dtype=torch.float32)

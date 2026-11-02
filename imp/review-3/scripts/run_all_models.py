@@ -7,6 +7,10 @@ and compiles a unified comparative benchmark table across all models and SNR lev
 from __future__ import annotations
 
 import argparse
+import copy
+import hashlib
+import inspect
+import numpy as np
 import csv
 import json
 import os
@@ -22,74 +26,137 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 if str(PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(PACKAGE_ROOT))
 
-from src.dataset import get_dataloader, get_dataset
+from src.dataset import get_dataloader, get_dataset, MixtureDataset
 from src.models import build_model, list_available_models
 from src.trainer import Trainer
 from src.utils import count_parameters, set_seed, setup_logger
 
 
-def train_single_model(
-    model_name: str,
-    config: dict,
-    epochs: int | None = None,
-    batch_size: int | None = None,
-    device: torch.device | None = None,
-    smoke_test: bool = False,
-) -> dict:
-    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = PACKAGE_ROOT / config.get("logging", {}).get("log_dir", "logs")
-    log_file = log_dir / f"{model_name}_{timestamp}.log"
-    logger = setup_logger(name=f"train_{model_name}", log_file=log_file)
+CANONICAL_MODELS = ("pann_cnn10", "ced_tiny", "ced_mini", "ced_small", "efficient_mn10", "vit_s", "mobilevit", "mobilenet", "beats")
 
-    logger.info("Initializing run for model: %s (Log file: %s)", model_name, log_file)
 
-    data_cfg = config.get("dataset", {})
-    train_cfg = config.get("training", {})
-    if epochs:
-        train_cfg["epochs"] = epochs
-    if batch_size:
-        train_cfg["batch_size"] = batch_size
-
-    if smoke_test:
-        train_cfg["epochs"] = 1
-        train_cfg["batch_size"] = 4
-        max_samples = 8
+def resolve_model_config(model_name, config):
+    effective = copy.deepcopy(config)
+    with Path(effective.get("_models_config", PACKAGE_ROOT/"config/models.yaml")).open(encoding="utf-8") as stream:
+        registry = yaml.safe_load(stream)
+    profile_key = {"pann_cnn10": "panns_cnn10", "efficient_mn10": "efficientat_mn10"}.get(model_name, model_name)
+    if model_name.startswith("ced_"):
+        profile_key = "ced_meanpool"
+    profile = registry.get("kd_profiles", {}).get(profile_key, {})
+    training, front = effective["training"], effective["frontend"]
+    if profile:
+        for key in ("lr", "weight_decay", "warmup_ratio", "layer_decay", "drop_path"):
+            if key in profile:
+                training[key] = profile[key]
+        training["head_lr"] = training["lr"]
+        front.update(profile.get("frontend", {}))
     else:
-        max_samples = None
+        rates = registry["ce_only_benchmark"]["missing_profile_lr"][model_name]
+        training["lr"], training["head_lr"] = rates["backbone"], rates["head"]
+    if training.get("explicit_cli_lr") is not None:
+        training["lr"] = training["head_lr"] = float(training["explicit_cli_lr"])
+    masks = profile.get("specaugment", {})
+    for key in ("freq_masks", "freq_width", "time_masks", "time_width"):
+        if key in masks:
+            front["specaug_"+key] = masks[key]
+    effective["ce_only"] = {"input": "raw mixture v2", "teacher": False, "kd": False, "moe": False,
+                            "stage1_epochs_applied": 0, "pretrained": False,
+                            "implementation": "existing imp/review-3 model constructors, unchanged",
+                            "profile": profile_key if profile else "common + user-selected previous baseline LRs",
+                            "original_run_json_executed": False,
+                            "architecture_policy": "retain Review-3 backbone, pooling and initialization; KD-profile architecture fields not applied",
+                            "selection": "mean Balanced Accuracy over six SNRs, present classes in each SNR",
+                            "report_weights": "best_raw"}
+    training["micro_batch_size"] = min(int(training["batch_size"]), {"beats": 8, "ced_small": 16, "vit_s": 16, "mobilevit": 16}.get(model_name, 32))
+    if training["batch_size"] % training["micro_batch_size"]:
+        raise ValueError("Effective batch must be divisible by micro-batch")
+    training["accumulation"] = training["batch_size"]//training["micro_batch_size"]
+    effective["logging"]["metric_for_best"] = "macro_acc"
+    return effective
 
-    set_seed(train_cfg.get("seed", 42))
 
-    data_root = data_cfg.get("data_root")
-    num_classes = data_cfg.get("num_classes", 36)
+def configure_existing_model(model_name, config):
+    from src.frontend import LogMel, SpecAugment
+    from timm.layers import DropPath
+    front = config["frontend"]
+    model = build_model(model_name, num_classes=config["dataset"]["num_classes"],
+                        sample_rate=config["dataset"]["sample_rate"], n_mels=front["n_mels"], num_frames=front["num_frames"])
+    names = ("sample_rate", "n_fft", "win_length", "hop_length", "n_mels", "f_min", "f_max", "num_frames", "log_eps", "norm_eps")
+    model.frontend = LogMel(**{k: front[k] for k in names})
+    model.spec_augment = SpecAugment(**{k: front["specaug_"+k] for k in ("freq_masks", "freq_width", "time_masks", "time_width")})
+    drop_path = float(config["training"].get("drop_path", 0.))
+    if model_name.startswith("ced_") and drop_path:
+        for i, block in enumerate(model.blocks):
+            probability = drop_path*i/max(len(model.blocks)-1, 1)
+            # Apply the requested residual regularizer; retain existing block forward and weights.
+            block.proj_drop = torch.nn.Sequential(block.proj_drop, DropPath(probability))
+            block.mlp.add_module("configured_drop_path", DropPath(probability))
+    return model
 
-    train_ds = get_dataset(root=data_root, split="train", num_classes=num_classes, max_samples=max_samples)
-    val_ds = get_dataset(root=data_root, split="validation", num_classes=num_classes, max_samples=max_samples)
-    test_ds = get_dataset(root=data_root, split="test", num_classes=num_classes, max_samples=max_samples)
 
-    train_loader = get_dataloader(train_ds, batch_size=train_cfg["batch_size"], shuffle=True)
-    val_loader = get_dataloader(val_ds, batch_size=train_cfg.get("eval_batch_size", 32), shuffle=False)
-    test_loader = get_dataloader(test_ds, batch_size=train_cfg.get("eval_batch_size", 32), shuffle=False)
+def _stratified_indices(dataset):
+    chosen = {}
+    for i,row in enumerate(dataset.rows):
+        key=(int(np.argmax(json.loads(row["multi_hot_36"]))),int(float(row["target_snr_db"])))
+        chosen.setdefault(key,i)
+    return sorted(chosen.values())
 
-    model = build_model(model_name, num_classes=num_classes)
 
-    trainer = Trainer(
-        model=model,
-        train_loader=train_loader,
-        val_loader=val_loader,
-        test_loader=test_loader,
-        config=config,
-        device=device,
-        logger=logger,
-        checkpoint_dir=PACKAGE_ROOT / "checkpoints",
-        model_name=model_name,
-    )
-
-    result = trainer.fit()
-    result["model_name"] = model_name
-    result["log_file"] = str(log_file)
-    total_p, _ = count_parameters(model)
-    result["params_m"] = total_p / 1e6
+def train_single_model(model_name, config, epochs=None, batch_size=None, device=None, smoke_test=False):
+    from torch.utils.data import DataLoader, RandomSampler, Subset
+    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    config = resolve_model_config(model_name, config)
+    t, d = config["training"], config["dataset"]
+    if epochs:
+        t["epochs"] = epochs
+    if batch_size:
+        t["batch_size"] = batch_size
+        t["micro_batch_size"] = min(t["micro_batch_size"], batch_size)
+        t["accumulation"] = batch_size//t["micro_batch_size"]
+    if smoke_test:
+        t["epochs"], t["micro_batch_size"], t["accumulation"] = 1,4,16
+        d["num_workers"] = 0
+    torch.set_num_threads(4)
+    set_seed(t["seed"])
+    log_dir = PACKAGE_ROOT/config["logging"].get("log_dir", "logs")
+    log_file = log_dir/(model_name+("_smoke" if smoke_test else "_group_ce")+".log")
+    logger = setup_logger(name="train_"+model_name,log_file=log_file)
+    logger.info("Original Review-3 constructors retained. No pretrained checkpoints loaded.")
+    kwargs = dict(root=d["data_root"], sample_rate=d["sample_rate"],duration=d["duration"],num_classes=d["num_classes"],waveform_cache=d.get("waveform_cache"))
+    train_ds=MixtureDataset(split="train",**kwargs)
+    val_ds=MixtureDataset(split="eval",**kwargs)
+    if len(train_ds)!=30240 or len(val_ds)!=3064:
+        raise ValueError(f"Expected clean v2 30240/3064; got {len(train_ds)}/{len(val_ds)}")
+    train_ids=[r["sample_id"] for r in train_ds.rows]
+    val_ids=[r["sample_id"] for r in val_ds.rows]
+    if set(train_ids)&set(val_ids):
+        raise ValueError("Train/validation IDs overlap")
+    config["data_audit"]={"train_samples":len(train_ds),"validation_samples":len(val_ds),"test_opened":False,
+                          "train_manifest_sha256":hashlib.sha256((Path(d["data_root"])/"train/manifest.csv").read_bytes()).hexdigest(),
+                          "eval_manifest_sha256":hashlib.sha256((Path(d["data_root"])/"eval/manifest.csv").read_bytes()).hexdigest(),
+                          "labels_sha256":hashlib.sha256((Path(d["data_root"])/"labels.txt").read_bytes()).hexdigest(),
+                          "train_ids_sha256":hashlib.sha256("\n".join(train_ids).encode()).hexdigest(),
+                          "eval_ids_sha256":hashlib.sha256("\n".join(val_ids).encode()).hexdigest()}
+    config["dataset"]["class_names"]=train_ds.class_names
+    if smoke_test:
+        train_ds=Subset(train_ds,_stratified_indices(train_ds))
+        val_ds=Subset(val_ds,_stratified_indices(val_ds))
+    order=torch.Generator().manual_seed(t["seed"])
+    workers=int(d.get("num_workers",4))
+    loader_kwargs=dict(num_workers=workers,pin_memory=device.type=="cuda",persistent_workers=workers>0)
+    train_loader=DataLoader(train_ds,batch_size=t["micro_batch_size"],sampler=RandomSampler(train_ds,generator=order),**loader_kwargs)
+    val_loader=DataLoader(val_ds,batch_size=min(8,t["eval_batch_size"]) if smoke_test else t["eval_batch_size"],shuffle=False,**loader_kwargs)
+    model=configure_existing_model(model_name,config)
+    source=Path(inspect.getfile(type(model)))
+    config["model_source"]={"class":type(model).__module__+"."+type(model).__name__,"file":str(source.relative_to(PACKAGE_ROOT)),
+                            "sha256":hashlib.sha256(source.read_bytes()).hexdigest(),"external_pretrained_loaded":False}
+    directory=PACKAGE_ROOT/config["logging"].get("checkpoint_dir","checkpoints")
+    if smoke_test:
+        directory=directory/"smoke"
+    trainer=Trainer(model,train_loader,val_loader,test_loader=None,config=config,device=device,logger=logger,checkpoint_dir=directory,model_name=model_name)
+    result=trainer.fit()
+    result["log_file"]=str(log_file)
+    result["params_m"]=count_parameters(model)[0]/1e6
     return result
 
 

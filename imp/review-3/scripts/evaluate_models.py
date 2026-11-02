@@ -144,12 +144,6 @@ def main():
             results.append(res)
         else:
             print(f"Skipping {name}: Checkpoint not found at {ckpt}")
-                num_classes=num_classes,
-                max_samples=args.max_samples,
-            )
-            results.append(res)
-        else:
-            print(f"Skipping {name}: Checkpoint not found at {ckpt}")
 
     if results:
         out_summary = PACKAGE_ROOT / "logs" / "evaluation_summary.json"

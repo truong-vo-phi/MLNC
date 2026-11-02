@@ -13,6 +13,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import copy
+import hashlib
+import subprocess
 import json
 import sys
 from datetime import datetime
@@ -74,63 +77,78 @@ def cmd_verify(args: argparse.Namespace) -> None:
 
 
 def cmd_train(args: argparse.Namespace) -> None:
-    config_path = PACKAGE_ROOT / args.config
-    with open(config_path, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-
-    # CLI Overrides
+    from scripts.run_all_models import CANONICAL_MODELS, train_single_model
+    from src.trainer import write_json
+    path = PACKAGE_ROOT / args.config
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
     if args.epochs:
-        config.setdefault("training", {})["epochs"] = args.epochs
+        config["training"]["epochs"] = args.epochs
     if args.batch_size:
-        config.setdefault("training", {})["batch_size"] = args.batch_size
+        config["training"]["batch_size"] = args.batch_size
     if args.lr:
-        config.setdefault("training", {})["lr"] = args.lr
+        config["training"]["explicit_cli_lr"] = args.lr
     if args.data_root:
-        config.setdefault("dataset", {})["data_root"] = args.data_root
-
-    device_str = args.device or config.get("training", {}).get("device", "auto")
-    if device_str == "auto":
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    else:
-        device = torch.device(device_str)
-
-    all_keys = list_available_models()
-    target_models = all_keys if args.model.lower() == "all" else [args.model]
-
-    for model_name in target_models:
-        if model_name not in all_keys:
-            print(f"Error: Unknown model '{model_name}'. Available: {all_keys}")
-            sys.exit(1)
-
-    print("=" * 86)
-    print(f"REVIEW-3: TRAINING {'ALL MODELS' if len(target_models) > 1 else target_models[0].upper()}")
-    print(f"Device: {device} | Smoke Test: {args.smoke} | Epochs: {config.get('training', {}).get('epochs')}")
-    print("=" * 86)
-
-    from scripts.run_all_models import train_single_model
-
-    results = []
-    for model_name in target_models:
-        print(f"\n[>>>] Starting training pipeline for: {model_name}...")
-        try:
-            res = train_single_model(
-                model_name=model_name,
-                config=config,
-                device=device,
-                smoke_test=args.smoke,
-            )
-            results.append(res)
-            print(f"[OK] Finished {model_name}: Best Metric = {res['best_metric']:.4f}")
-            print(f"    Log file saved to: {res['log_file']}")
-        except Exception as e:
-            print(f"[ERROR] Failed {model_name}: {e}")
-            import traceback
-            traceback.print_exc()
-
-    summary_file = PACKAGE_ROOT / "logs" / "latest_training_summary.json"
-    with open(summary_file, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2)
-    print(f"\nAll requested training tasks finished. Summary written to {summary_file}")
+        config["dataset"]["data_root"] = str(Path(args.data_root).resolve())
+    if args.waveform_cache:
+        config["dataset"]["waveform_cache"] = str(Path(args.waveform_cache).resolve())
+    if args.workers is not None:
+        config["dataset"]["num_workers"] = args.workers
+    registry_path = Path(args.models_config).resolve() if args.models_config else PACKAGE_ROOT/"config/models.yaml"
+    config["_models_config"] = str(registry_path)
+    config["source_configs"] = {"config_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                                "models_sha256": hashlib.sha256(registry_path.read_bytes()).hexdigest()}
+    device_name = args.device or config["training"].get("device", "auto")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if device_name == "auto" else torch.device(device_name)
+    if args.model == "all":
+        directory = PACKAGE_ROOT/"logs"
+        directory.mkdir(exist_ok=True)
+        suffix = "smoke" if args.smoke else "group_ce"
+        snapshot = directory/f"{suffix}_config_snapshot.yaml"
+        registry_snapshot = directory/f"{suffix}_models_snapshot.yaml"
+        snapshot.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+        registry_snapshot.write_text(registry_path.read_text(encoding="utf-8"), encoding="utf-8")
+        failures, completed = [], []
+        records = []
+        for i, name in enumerate(CANONICAL_MODELS, 1):
+            write_json(directory/f"{suffix}_queue.json", {"status": "running", "current": name, "index": i,
+                       "total": len(CANONICAL_MODELS), "completed": completed, "failed": failures})
+            command = [sys.executable, "-u", str(Path(__file__).resolve()), "train", "--model", name,
+                       "--config", str(snapshot), "--models-config", str(registry_snapshot), "--device", str(device)]
+            if args.smoke:
+                command.append("--smoke")
+            print(f"REVIEW-3 {i}/9: {name}; original constructors, raw mixture, CE-only", flush=True)
+            child = subprocess.run(command, cwd=PACKAGE_ROOT)
+            if child.returncode:
+                failures.append(name)
+            else:
+                completed.append(name)
+                checkpoint_dir=PACKAGE_ROOT/config["logging"]["checkpoint_dir"]
+                if args.smoke:
+                    checkpoint_dir=checkpoint_dir/"smoke"
+                result=json.loads((checkpoint_dir/name/"results.json").read_text(encoding="utf-8"))
+                records.append(result)
+            write_json(directory/f"{suffix}_summary.json", records)
+            lines=["# Review-3 CE-only theo cấu hình nhóm", "", "Implementation: imp/review-3; initialization retained (no added pretrained weights). Raw mixture v2; validation only.", "",
+                   "| Model | Params (M) | Trainable (M) | Epochs | Best | acc | precision | recall | macro_f1 | micro_f1 | mAP | macro_acc selection |",
+                   "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+            by_name={v["model_name"]:v for v in records}
+            for key in CANONICAL_MODELS:
+                if key in by_name:
+                    r=by_name[key]
+                    v=r["validation"]
+                    lines.append(f"| {key} | {r['parameters']/1e6:.3f} | {r['trainable']/1e6:.3f} | {r['epochs_ran']} | {r['best_epoch']} | "+" | ".join(f"{v[k]*100:.2f}%" for k in ("acc","precision","recall","macro_f1","micro_f1","mAP","macro_acc"))+" |")
+                else:
+                    lines.append(f"| {key} | {'failed' if key in failures else 'pending'} | — | — | — | — | — | — | — | — | — | — |")
+            (directory/f"{suffix}_summary.md").write_text("\n".join(lines), encoding="utf-8")
+        write_json(directory/f"{suffix}_queue.json", {"status": "complete" if not failures else "completed_with_failures",
+                   "completed": completed, "failed": failures})
+        if failures:
+            raise SystemExit(1)
+        return
+    if args.model not in CANONICAL_MODELS:
+        raise ValueError(f"This CE-only command selects exactly these nine models: {CANONICAL_MODELS}")
+    result = train_single_model(args.model, config=config, device=device, smoke_test=args.smoke)
+    print(f"COMPLETE {args.model}: best_epoch={result['best_epoch']} macro_acc={result['best_metric']:.6f}", flush=True)
 
 
 def cmd_eval(args: argparse.Namespace) -> None:
@@ -308,6 +326,9 @@ def main():
     parser_train.add_argument("--batch-size", type=int, default=None, help="Batch size")
     parser_train.add_argument("--lr", type=float, default=None, help="Learning rate")
     parser_train.add_argument("--data-root", type=str, default=None, help="Root path of mixture dataset")
+    parser_train.add_argument("--waveform-cache", type=str, default=None, help="Verified raw-mixture cache directory; never FRCRN cache")
+    parser_train.add_argument("--models-config", type=str, default=None, help="Snapshot of model profiles")
+    parser_train.add_argument("--workers", type=int, default=None)
     parser_train.add_argument("--smoke", action="store_true", help="Quick 1-epoch smoke test run")
     parser_train.add_argument("--device", type=str, default="auto", help="Compute device ('cuda', 'cpu', 'auto')")
     parser_train.add_argument("--config", type=str, default="config/config.yaml", help="Path to config.yaml")
@@ -360,27 +381,6 @@ def main():
     parser_moe.add_argument("--no-kd", action="store_true", help="Disable BEATs Knowledge Distillation")
     parser_moe.add_argument("--device", type=str, default="auto", help="Compute device ('cuda', 'cpu', 'auto')")
 
-    # kd (Task 3: BEATs -> CED-Tiny Knowledge Distillation)
-    parser_kd = subparsers.add_parser("kd", help="Task 3: BEATs -> CED-Tiny KD (5 methods + BeatBiasPostLN comparison)")
-    parser_kd.add_argument("--method", type=str, default="all",
-                           choices=["all", "logit", "crd", "mgd", "logit+crd", "logit+mgd"],
-                           help="Specific KD method or 'all' to run complete benchmark")
-    parser_kd.add_argument("--epochs", type=int, default=None, help="Number of training epochs")
-    parser_kd.add_argument("--batch-size", type=int, default=None, help="Batch size")
-    parser_kd.add_argument("--smoke", action="store_true", help="Quick 1-epoch smoke test")
-    parser_kd.add_argument("--noise-cache", type=str, default=None, help="Path to FRCRN-masked .npy cache or directory")
-    parser_kd.add_argument("--data-root", type=str, default=None, help="Root path of mixture dataset")
-    parser_kd.add_argument("--device", type=str, default="auto", help="Compute device ('cuda', 'cpu', 'auto')")
-    parser_kd.add_argument("--config", type=str, default="config/config.yaml", help="Path to config.yaml")
-
-    # moe (Task 4: Proposed CED-SingleMoE-SplitFFN ~6.62M params Benchmark)
-    parser_moe = subparsers.add_parser("moe", help="Task 4: Benchmark proposed CED-SingleMoE-SplitFFN (~6.62M params)")
-    parser_moe.add_argument("--epochs", type=int, default=15, help="Number of training epochs")
-    parser_moe.add_argument("--batch-size", type=int, default=32, help="Batch size")
-    parser_moe.add_argument("--smoke", action="store_true", help="Quick 1-epoch smoke test")
-    parser_moe.add_argument("--no-kd", action="store_true", help="Disable BEATs Knowledge Distillation")
-    parser_moe.add_argument("--device", type=str, default="auto", help="Compute device ('cuda', 'cpu', 'auto')")
-
     args = parser.parse_args()
 
     if args.command == "list-models":
@@ -393,10 +393,6 @@ def main():
         cmd_eval(args)
     elif args.command == "eval-masked":
         cmd_eval_masked(args)
-    elif args.command == "kd":
-        cmd_kd(args)
-    elif args.command == "moe":
-        cmd_moe(args)
     elif args.command == "kd":
         cmd_kd(args)
     elif args.command == "moe":

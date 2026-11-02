@@ -526,3 +526,71 @@ python main.py moe --epochs 15 --no-kd
 
 
 
+
+
+## CE-only rerun with the shared group config (2026-11-02)
+
+Use the existing models in **this `imp/review-3` folder**. No external model
+adapter, alternate architecture folder or pretrained weights are added. The
+Review-3 constructors and all `src/models/*.py` files are retained, including
+`pretrained=False` where present. These runs must be reported separately from
+previous AudioSet/ImageNet-pretrained benchmarks.
+
+Single entry point (run from `imp/review-3`):
+
+```powershell
+python main.py train --model all --data-root "D:/data/mix-dataset-v2" --waveform-cache "D:/data/raw_mixture_cache"
+```
+
+`--waveform-cache` is optional and accepts only the verified **raw mixture**
+cache (`train_mixture.npy`, `eval_mixture.npy`, `provenance.json`). It checks the
+manifest SHA-256, sample IDs/order and shapes. Do not pass FRCRN cache arrays.
+Without this option, WAV files are resolved from split/sample_id. No test split
+is constructed or evaluated by this training command.
+
+The shared `config/config.yaml` is applied with per-backbone optimizer,
+frontend and SpecAugment profiles from `config/models.yaml:kd_profiles`.
+The nine original CE backbones are kept: PANNs, three CED variants, Efficient
+MN10, ViT-S, MobileViT, MobileNet and Review-3 BEATs. Architecture/pooling fields
+of the separate KD profiles are not used to replace these model classes.
+In particular the existing Review-3 CED keeps its CLS pooling; the `ced_meanpool`
+profile supplies training hyperparameters, not a new backbone.
+
+- Maximum 50 epochs, patience 8, seed 2026, AdamW, label smoothing 0.1, BF16.
+- Effective train batch 64 using accumulation where needed; eval batch 64;
+  four persistent data workers. Micro-batches and BatchNorm behavior are recorded.
+- Per-profile LR/weight decay/warmup, cosine to the requested minimum LR.
+  CED uses layer LR decay 0.3 and configured DropPath 0.1 via its existing residual modules.
+- User-selected LR fallback: ViT-S/MobileViT/MobileNet backbone 3e-5, head 3e-4;
+  BEATs backbone 1e-5, head 1e-4. Other common settings still apply.
+- EMA 0.999 is tracked; **raw weights** select the checkpoint and produce the report.
+- Plain CE only. KD, Teacher, FRCRN, MoE, frontend reconstruction/router losses
+  and the KD-specific eight-epoch stage 1 are not invoked.
+- `macro_acc` selection is the mean **Balanced Accuracy** across the six SNR
+  slices, averaging recall over present classes inside each slice. There is no
+  silent fallback to Macro-F1 or pooled accuracy.
+
+The queue freezes the effective input YAMLs into `logs/`, runs one subprocess per
+model and records completion/failure. Each model has `checkpoints/<model>/best.pt`,
+`last.pt` (optimizer/scheduler/EMA/RNG for resume), `effective_config.json`,
+`optimizer_groups.json`, `history.csv/json`, `results.json`, predictions and
+`metrics_per_snr.csv`. All six requested metrics are logged at every epoch for
+all six SNRs plus `all`; train and validation loss/accuracy/mAP are explicit.
+Train metrics aggregate online train-mode outputs; validation uses fixed weights.
+Aggregate progress/report: `logs/group_ce_queue.json` and `logs/group_ce_summary.md`.
+
+Only one queue should run on the GPU. Re-running the same command resumes at the
+last completed epoch; differing effective configs are rejected. Resume after an
+early-stop decision finalizes the existing best checkpoint without extending it.
+
+Verification using this same entry point:
+
+```powershell
+python -m pytest tests -q
+python main.py train --model all --data-root "D:/data/mix-dataset-v2" --waveform-cache "D:/data/raw_mixture_cache" --smoke
+```
+
+Smoke uses 216 real train/eval examples (one per class/SNR pair), one epoch,
+separate `checkpoints/smoke/` artifacts and no synthetic substitute. Its scores
+are integration checks, not benchmark results. CLI duplicate-parser and stale
+validation path issues were fixed without rewriting the backbone definitions.

@@ -1,270 +1,267 @@
-"""
-Trainer Engine for Review-3 Models:
-Tracks training progress, computes acc/precision/recall/macro_f1/micro_f1/mAP,
-logs detailed epoch updates and per-SNR breakdowns to .log files.
-"""
-
+"""Existing Review-3 Trainer with effective group schedules and complete CE logs."""
 from __future__ import annotations
 
+import csv
+import hashlib
 import json
 import logging
 import math
-import time
 from pathlib import Path
+import random
+import re
+import time
 from typing import Any
 
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch import nn
+from src.metrics import compute_macro_acc, compute_metrics, compute_snr_breakdown
+from src.utils import count_parameters
 
-from src.metrics import compute_metrics, compute_snr_breakdown
-from src.utils import count_parameters, save_checkpoint
+
+def write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(value, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    tmp.replace(path)
 
 
 class Trainer:
-    """
-    Standard Trainer supporting any Review-3 Audio Classifier.
-    """
-
-    def __init__(
-        self,
-        model: nn.Module,
-        train_loader: DataLoader,
-        val_loader: DataLoader,
-        test_loader: DataLoader | None = None,
-        config: dict[str, Any] | None = None,
-        device: torch.device | None = None,
-        logger: logging.Logger | None = None,
-        checkpoint_dir: str | Path = "checkpoints",
-        model_name: str = "model",
-    ) -> None:
+    def __init__(self, model, train_loader, val_loader, test_loader=None, config=None,
+                 device=None, logger=None, checkpoint_dir="checkpoints", model_name="model"):
         self.config = config or {}
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model.to(self.device)
-        self.train_loader = train_loader
-        self.val_loader = val_loader
+        self.train_loader, self.val_loader = train_loader, val_loader
         self.test_loader = test_loader
         self.logger = logger or logging.getLogger("trainer")
         self.checkpoint_dir = Path(checkpoint_dir) / model_name
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         self.model_name = model_name
-
-        train_cfg = self.config.get("training", {})
-        self.epochs = train_cfg.get("epochs", 30)
-        self.lr = float(train_cfg.get("lr", 3.0e-4))
-        self.weight_decay = float(train_cfg.get("weight_decay", 0.05))
-        self.grad_clip = float(train_cfg.get("grad_clip", 1.0))
-        self.label_smoothing = float(train_cfg.get("label_smoothing", 0.1))
-        self.patience = int(train_cfg.get("patience", 7))
-        self.metric_for_best = self.config.get("logging", {}).get("metric_for_best", "macro_f1")
-
-        # Criterion with label smoothing
+        t = self.config.get("training", {})
+        self.epochs = int(t.get("epochs", 50))
+        self.lr = float(t.get("lr", 3e-4))
+        self.weight_decay = float(t.get("weight_decay", .05))
+        self.grad_clip = float(t.get("grad_clip", 1.))
+        self.label_smoothing = float(t.get("label_smoothing", .1))
+        self.patience = int(t.get("patience", 8))
+        self.accumulation = int(t.get("accumulation", 1))
+        self.effective_batch = int(t.get("batch_size", train_loader.batch_size))
+        self.metric_for_best = self.config.get("logging", {}).get("metric_for_best", "macro_acc")
         self.criterion = nn.CrossEntropyLoss(label_smoothing=self.label_smoothing)
+        self.use_amp = self.device.type == "cuda" and t.get("amp", "bf16") in ("bf16", "bfloat16")
+        self.optimizer = torch.optim.AdamW(self._parameter_groups(), betas=tuple(t.get("betas", (.9, .999))))
+        steps = math.ceil(len(train_loader) / self.accumulation)
+        total_steps = self.epochs * steps
+        warmup = max(int(total_steps * float(t.get("warmup_ratio", .05))), 1)
+        functions = []
+        for group in self.optimizer.param_groups:
+            floor = float(t.get("min_lr", 1e-6)) / group["reference_lr"]
+            def schedule(step, floor=floor):
+                if step < warmup:
+                    return (step + 1) / warmup
+                progress = min(max((step-warmup)/max(total_steps-warmup, 1), 0.), 1.)
+                return floor + (1-floor) * .5 * (1+math.cos(math.pi*progress))
+            functions.append(schedule)
+        self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, functions)
+        self.ema_decay = float(t.get("ema_decay", .999))
+        self.ema = {name: value.detach().clone() for name, value in self.model.named_parameters()}
+        self.best_metric, self.best_epoch, self.patience_counter = -1., -1, 0
+        self.history = []
+        self.first_epoch = 0
+        self.last_predictions = None
+        self.train_mAP = 0.
+        last = self.checkpoint_dir / "last.pt"
+        if last.is_file():
+            state = torch.load(last, map_location="cpu", weights_only=False)
+            if state["config"] != self.config:
+                raise ValueError("Existing checkpoint belongs to a different effective config; refusing overwrite")
+            self.model.load_state_dict(state["model_state_dict"], strict=True)
+            self.optimizer.load_state_dict(state["optimizer_state_dict"])
+            self.scheduler.load_state_dict(state["scheduler_state_dict"])
+            self.ema = {k: v.to(self.device) for k, v in state["ema"].items()}
+            self.first_epoch = state["epoch"]
+            self.history = state["history"]
+            self.best_metric, self.best_epoch = state["best_metric"], state["best_epoch"]
+            self.patience_counter = state["patience_counter"]
+            random.setstate(state["python_rng"])
+            np.random.set_state(state["numpy_rng"])
+            torch.set_rng_state(state["torch_rng"])
+            if self.device.type == "cuda":
+                torch.cuda.set_rng_state_all(state["cuda_rng"])
+            if state.get("sampler_rng") is not None:
+                self.train_loader.sampler.generator.set_state(state["sampler_rng"])
+            del state
 
-        # Optimizer
-        self.optimizer = torch.optim.AdamW(
-            self.model.parameters(),
-            lr=self.lr,
-            weight_decay=self.weight_decay,
-            betas=tuple(train_cfg.get("betas", (0.9, 0.999))),
-        )
-
-        # Scheduler: Warmup + Cosine Annealing
-        warmup_epochs = train_cfg.get("warmup_epochs", 2)
-        total_steps = self.epochs * len(train_loader)
-        warmup_steps = warmup_epochs * len(train_loader)
-        min_lr_ratio = train_cfg.get("min_lr_ratio", 0.01)
-
-        def lr_lambda(step: int) -> float:
-            if step < warmup_steps:
-                return float(step + 1) / float(max(1, warmup_steps))
-            progress = float(step - warmup_steps) / float(max(1, total_steps - warmup_steps))
-            return min_lr_ratio + (1.0 - min_lr_ratio) * 0.5 * (1.0 + math.cos(math.pi * progress))
-
-        self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda)
-
-        # Tracking state
-        self.best_metric = -1.0
-        self.best_epoch = -1
-        self.patience_counter = 0
-        self.history: list[dict[str, Any]] = []
-
-    def _log_header(self) -> None:
-        total_p, train_p = count_parameters(self.model)
-        self.logger.info("=" * 78)
-        self.logger.info("STARTING TRAINING PIPELINE: %s", self.model_name.upper())
-        self.logger.info("Device: %s | Model Parameters: Total=%d (%.2fM), Trainable=%d (%.2fM)",
-                         self.device, total_p, total_p / 1e6, train_p, train_p / 1e6)
-        self.logger.info("Configuration: %s", json.dumps(self.config, indent=2, default=str))
-        self.logger.info("=" * 78)
-
-    def train_epoch(self, epoch: int) -> tuple[float, float]:
-        self.model.train()
-        total_loss = 0.0
-        correct = 0
-        total_samples = 0
-
-        for batch_idx, batch in enumerate(self.train_loader):
-            waveform = batch["waveform"].to(self.device, non_blocking=True)
-            target = batch["target"].to(self.device, non_blocking=True)
-
-            self.optimizer.zero_grad()
-            logits = self.model(waveform)
-            loss = self.criterion(logits, target)
-
-            loss.backward()
-            if self.grad_clip > 0:
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip)
-
-            self.optimizer.step()
-            self.scheduler.step()
-
-            total_loss += float(loss.item()) * waveform.size(0)
-            preds = logits.argmax(dim=-1)
-            target_idx = target.argmax(dim=-1) if target.dim() > 1 else target
-            correct += int((preds == target_idx).sum().item())
-            total_samples += waveform.size(0)
-
-        epoch_loss = total_loss / max(1, total_samples)
-        epoch_acc = correct / max(1, total_samples)
-        return epoch_loss, epoch_acc
+    def _parameter_groups(self):
+        training = self.config.get("training", {})
+        head_lr = float(training.get("head_lr", self.lr))
+        layer_decay = float(training.get("layer_decay", 1.))
+        no_decay = ("bias", "ln", "norm", "pos", "a_att", "a_gru")
+        groups = {}
+        for name, p in self.model.named_parameters():
+            if not p.requires_grad:
+                continue
+            head = name.startswith("head.") or ".head." in name or ".classifier." in name
+            reference = head_lr if head else self.lr
+            scale = 1.
+            if self.model_name.startswith("ced_") and layer_decay < 1 and not head:
+                match = re.search(r"(?:^|\.)blocks\.(\d+)\.", name)
+                if match:
+                    scale = layer_decay ** (11-int(match[1]))
+                elif any(k in name for k in ("patch_embed", "cls_token", "rel_pos_bias")):
+                    scale = layer_decay ** 12
+            decay = 0. if any(k in name for k in no_decay) else self.weight_decay
+            key = (reference, scale, decay)
+            if key not in groups:
+                groups[key] = {"params": [], "lr": reference*scale, "reference_lr": reference,
+                               "layer_scale": scale, "weight_decay": decay, "parameter_names": []}
+            groups[key]["params"].append(p)
+            groups[key]["parameter_names"].append(name)
+        return list(groups.values())
 
     @torch.no_grad()
-    def evaluate(self, loader: DataLoader) -> tuple[float, dict[str, float], dict[str, dict[str, float]]]:
+    def _update_ema(self):
+        for name, parameter in self.model.named_parameters():
+            self.ema[name].mul_(self.ema_decay).add_(parameter.detach(), alpha=1-self.ema_decay)
+
+    def train_epoch(self, epoch):
+        self.model.train()
+        total_loss, total_samples, correct = 0., 0, 0
+        probabilities, targets = [], []
+        self.optimizer.zero_grad(set_to_none=True)
+        for index, batch in enumerate(self.train_loader):
+            wave = batch["waveform"].to(self.device, non_blocking=True)
+            y = batch["target_idx"].to(self.device, non_blocking=True)
+            window_start = (index//self.accumulation)*self.effective_batch
+            denominator = min(self.effective_batch, len(self.train_loader.dataset)-window_start)
+            with torch.autocast(self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
+                logits = self.model(wave).float()
+                loss = self.criterion(logits, y)
+            if not torch.isfinite(loss):
+                raise FloatingPointError("Non-finite train loss")
+            (loss*len(y)/denominator).backward()
+            if (index+1)%self.accumulation == 0 or index+1 == len(self.train_loader):
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip, error_if_nonfinite=True)
+                self.optimizer.step()
+                self.scheduler.step()
+                self._update_ema()
+                self.optimizer.zero_grad(set_to_none=True)
+            total_loss += float(loss.item())*len(y)
+            total_samples += len(y)
+            correct += int((logits.argmax(1) == y).sum())
+            probabilities.append(logits.detach().softmax(1).cpu().numpy())
+            targets.append(y.cpu().numpy())
+            if index % 100 == 0 or index+1 == len(self.train_loader):
+                self.logger.info("TRAIN epoch=%d/%d step=%d/%d n=%d train_loss=%.6f train_acc=%.6f",
+                                 epoch, self.epochs, index+1, len(self.train_loader), total_samples,
+                                 total_loss/total_samples, correct/total_samples)
+                write_json(self.checkpoint_dir/"status.json", {"status": "training", "epoch": epoch,
+                           "step": index+1, "steps": len(self.train_loader), "samples": total_samples})
+        self.train_mAP = compute_metrics(np.concatenate(probabilities), np.concatenate(targets))["mAP"]
+        return total_loss/max(total_samples, 1), correct/max(total_samples, 1)
+
+    @torch.no_grad()
+    def evaluate(self, loader):
         self.model.eval()
-        total_loss = 0.0
-        total_samples = 0
-        all_logits = []
-        all_targets = []
-        all_snrs = []
-
+        total_loss, total = 0., 0
+        probabilities, targets, snrs, ids = [], [], [], []
         for batch in loader:
-            waveform = batch["waveform"].to(self.device, non_blocking=True)
-            target = batch["target"].to(self.device, non_blocking=True)
-            snr_db = batch["snr_db"].cpu().numpy()
+            wave = batch["waveform"].to(self.device, non_blocking=True)
+            y = batch["target_idx"].to(self.device, non_blocking=True)
+            with torch.autocast(self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
+                logits = self.model(wave).float()
+                loss = self.criterion(logits, y)
+            if not torch.isfinite(logits).all() or not torch.isfinite(loss):
+                raise FloatingPointError("Non-finite validation output")
+            probabilities.append(logits.softmax(1).cpu().numpy())
+            targets.append(y.cpu().numpy())
+            snrs.append(batch["snr_db"].numpy())
+            ids.extend(batch["sample_id"])
+            total_loss += loss.item()*len(y)
+            total += len(y)
+        probs, y, snrs = np.concatenate(probabilities), np.concatenate(targets), np.concatenate(snrs)
+        metrics = compute_metrics(probs, y)
+        metrics["macro_acc"] = compute_macro_acc(probs, y, snrs)
+        breakdown = compute_snr_breakdown(probs, y, snrs)
+        breakdown["all"] = {**metrics, "count": len(y)}
+        self.last_predictions = {"probabilities": probs, "targets": y, "snrs": snrs, "sample_ids": np.array(ids)}
+        return total_loss/max(total, 1), metrics, breakdown
 
-            logits = self.model(waveform)
-            loss = self.criterion(logits, target)
+    def _save_history(self):
+        write_json(self.checkpoint_dir/"history.json", {"history": self.history, "best_metric": self.best_metric,
+                                                     "best_epoch": self.best_epoch, "test_evaluated": False})
+        fields = ("epoch", "train_loss", "train_acc", "train_mAP", "val_loss", "val_acc", "val_mAP", "val_macro_acc", "epoch_time_s")
+        with (self.checkpoint_dir/"history.csv").open("w", newline="", encoding="utf-8-sig") as stream:
+            writer = csv.DictWriter(stream, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows({k: row[k] for k in fields} for row in self.history)
 
-            total_loss += float(loss.item()) * waveform.size(0)
-            total_samples += waveform.size(0)
-
-            all_logits.append(logits.cpu().numpy())
-            all_targets.append(target.cpu().numpy())
-            all_snrs.append(snr_db)
-
-        val_loss = total_loss / max(1, total_samples)
-        logits_arr = np.concatenate(all_logits, axis=0)
-        targets_arr = np.concatenate(all_targets, axis=0)
-        snrs_arr = np.concatenate(all_snrs, axis=0)
-
-        num_classes = self.config.get("dataset", {}).get("num_classes", 36)
-        metrics = compute_metrics(logits_arr, targets_arr, num_classes=num_classes)
-        snr_breakdown = compute_snr_breakdown(logits_arr, targets_arr, snrs_arr, num_classes=num_classes)
-
-        return val_loss, metrics, snr_breakdown
-
-    def fit(self) -> dict[str, Any]:
-        self._log_header()
-        start_time = time.time()
-
-        for epoch in range(1, self.epochs + 1):
-            epoch_start = time.time()
+    def fit(self):
+        total_p, train_p = count_parameters(self.model)
+        self.logger.info("START %s parameters=%d trainable=%d", self.model_name, total_p, train_p)
+        self.logger.info("EFFECTIVE_CONFIG %s", json.dumps(self.config, ensure_ascii=False))
+        write_json(self.checkpoint_dir/"effective_config.json", self.config)
+        write_json(self.checkpoint_dir/"optimizer_groups.json", [{k: v for k, v in g.items() if k != "params"}
+                                                               for g in self.optimizer.param_groups])
+        for epoch in range(self.first_epoch+1, self.epochs+1):
+            if self.patience_counter >= self.patience:
+                break
+            started = time.monotonic()
             train_loss, train_acc = self.train_epoch(epoch)
-            val_loss, val_metrics, snr_breakdown = self.evaluate(self.val_loader)
-            epoch_time = time.time() - epoch_start
-
-            # Format primary log line
-            msg = (
-                f"[Epoch {epoch:02d}/{self.epochs:02d}] ({epoch_time:.1f}s) "
-                f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc*100:.2f}% | "
-                f"Val Loss: {val_loss:.4f} | Val Acc: {val_metrics['acc']*100:.2f}% | "
-                f"Precision: {val_metrics['precision']:.4f} | Recall: {val_metrics['recall']:.4f} | "
-                f"Macro-F1: {val_metrics['macro_f1']:.4f} | Micro-F1: {val_metrics['micro_f1']:.4f} | "
-                f"mAP: {val_metrics['mAP']:.4f}"
-            )
-            self.logger.info(msg)
-
-            # Format per-SNR breakdown
-            self.logger.info("  -> SNR Breakdown (Epoch %02d):", epoch)
-            for snr_tag, m in snr_breakdown.items():
-                self.logger.info(
-                    "     SNR %6s: Acc=%5.2f%% | Prec=%.4f | Rec=%.4f | Macro-F1=%.4f | Micro-F1=%.4f | mAP=%.4f",
-                    snr_tag,
-                    m["acc"] * 100,
-                    m["precision"],
-                    m["recall"],
-                    m["macro_f1"],
-                    m["micro_f1"],
-                    m["mAP"],
-                )
-
-            # Record history
-            record = {
-                "epoch": epoch,
-                "train_loss": train_loss,
-                "train_acc": train_acc,
-                "val_loss": val_loss,
-                "val_metrics": val_metrics,
-                "snr_breakdown": snr_breakdown,
-                "epoch_time_s": epoch_time,
-            }
-            self.history.append(record)
-
-            # Checkpoint best model
-            current_metric = val_metrics.get(self.metric_for_best, val_metrics["macro_f1"])
-            if current_metric > self.best_metric:
-                self.best_metric = current_metric
-                self.best_epoch = epoch
-                self.patience_counter = 0
-                best_path = self.checkpoint_dir / "best_model.pt"
-                save_checkpoint(
-                    {
-                        "epoch": epoch,
-                        "model_state_dict": self.model.state_dict(),
-                        "optimizer_state_dict": self.optimizer.state_dict(),
-                        "best_metric": self.best_metric,
-                        "val_metrics": val_metrics,
-                        "snr_breakdown": snr_breakdown,
-                        "config": self.config,
-                    },
-                    best_path,
-                )
-                self.logger.info("  [*] New best model saved to %s (Metric: %.4f)", best_path, self.best_metric)
+            val_loss, metrics, breakdown = self.evaluate(self.val_loader)
+            current = metrics[self.metric_for_best]  # No silent fallback to Macro-F1.
+            better = current > self.best_metric
+            if better:
+                self.best_metric, self.best_epoch, self.patience_counter = current, epoch, 0
             else:
                 self.patience_counter += 1
-                if self.patience_counter >= self.patience:
-                    self.logger.info("Early stopping triggered after %d epochs without improvement.", self.patience)
-                    break
-
-        total_time = time.time() - start_time
-        self.logger.info("=" * 78)
-        self.logger.info("TRAINING FINISHED: %s in %.1f minutes", self.model_name, total_time / 60.0)
-        self.logger.info("Best Epoch: %d with %s = %.4f", self.best_epoch, self.metric_for_best, self.best_metric)
-
-        # Final evaluation on test loader if provided
-        test_summary = {}
-        if self.test_loader is not None:
-            self.logger.info("Running final evaluation on Test Split...")
-            best_ckpt = self.checkpoint_dir / "best_model.pt"
-            if best_ckpt.is_file():
-                ckpt = torch.load(best_ckpt, map_location=self.device)
-                self.model.load_state_dict(ckpt["model_state_dict"])
-            test_loss, test_metrics, test_snr = self.evaluate(self.test_loader)
-            self.logger.info("Test Loss: %.4f | Acc: %.2f%% | Macro-F1: %.4f | mAP: %.4f",
-                             test_loss, test_metrics['acc'] * 100, test_metrics['macro_f1'], test_metrics['mAP'])
-            test_summary = {"test_loss": test_loss, "test_metrics": test_metrics, "test_snr": test_snr}
-
-        # Save history json
-        history_path = self.checkpoint_dir / "history.json"
-        with open(history_path, "w", encoding="utf-8") as f:
-            json.dump({"history": self.history, "test": test_summary, "best_metric": self.best_metric}, f, indent=2)
-
-        return {
-            "best_epoch": self.best_epoch,
-            "best_metric": self.best_metric,
-            "history": self.history,
-            "test": test_summary,
-        }
+            row = {"epoch": epoch, "train_loss": train_loss, "train_acc": train_acc, "train_mAP": self.train_mAP,
+                   "val_loss": val_loss, "val_acc": metrics["acc"], "val_mAP": metrics["mAP"],
+                   "val_macro_acc": metrics["macro_acc"], "val_metrics": metrics, "snr_breakdown": breakdown,
+                   "epoch_time_s": time.monotonic()-started}
+            self.history.append(row)
+            self.logger.info("EPOCH %d/%d train_loss=%.6f train_acc=%.6f train_mAP=%.6f val_loss=%.6f val_acc=%.6f val_mAP=%.6f val_macro_acc=%.6f best=%s seconds=%.1f",
+                             epoch, self.epochs, train_loss, train_acc, self.train_mAP, val_loss, metrics["acc"], metrics["mAP"], current, better, row["epoch_time_s"])
+            for tag, result in breakdown.items():
+                self.logger.info("VAL SNR=%s n=%d %s", tag, result["count"],
+                                 " ".join(f"{k}={result[k]:.6f}" for k in ("acc", "precision", "recall", "macro_f1", "micro_f1", "mAP")))
+            sampler = self.train_loader.sampler
+            state = {"epoch": epoch, "model_state_dict": self.model.state_dict(), "optimizer_state_dict": self.optimizer.state_dict(),
+                     "scheduler_state_dict": self.scheduler.state_dict(), "ema": self.ema, "best_metric": self.best_metric,
+                     "best_epoch": self.best_epoch, "patience_counter": self.patience_counter, "history": self.history,
+                     "config": self.config, "python_rng": random.getstate(), "numpy_rng": np.random.get_state(),
+                     "torch_rng": torch.get_rng_state(), "cuda_rng": torch.cuda.get_rng_state_all() if self.device.type == "cuda" else [],
+                     "sampler_rng": sampler.generator.get_state() if getattr(sampler, "generator", None) is not None else None}
+            temp = self.checkpoint_dir/"last.tmp.pt"
+            torch.save(state, temp)
+            temp.replace(self.checkpoint_dir/"last.pt")
+            if better:
+                best = {"epoch": epoch, "model_state_dict": self.model.state_dict(), "best_metric": self.best_metric,
+                        "val_metrics": metrics, "snr_breakdown": breakdown, "config": self.config}
+                temp = self.checkpoint_dir/"best.tmp.pt"
+                torch.save(best, temp)
+                temp.replace(self.checkpoint_dir/"best.pt")
+            del state
+            self._save_history()
+        best = torch.load(self.checkpoint_dir/"best.pt", map_location="cpu", weights_only=False)
+        self.model.load_state_dict(best["model_state_dict"], strict=True)
+        val_loss, metrics, breakdown = self.evaluate(self.val_loader)
+        if abs(metrics["macro_acc"]-self.best_metric) > 1e-12:
+            raise AssertionError("Reloaded checkpoint does not reproduce selected validation macro_acc")
+        np.savez(self.checkpoint_dir/"validation_predictions.npz", **self.last_predictions)
+        with (self.checkpoint_dir/"metrics_per_snr.csv").open("w", newline="", encoding="utf-8-sig") as stream:
+            fields = ("snr", "count", "acc", "precision", "recall", "macro_f1", "micro_f1", "mAP")
+            writer = csv.DictWriter(stream, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows({"snr": tag, **{k: v[k] for k in fields if k != "snr"}} for tag, v in breakdown.items())
+        result = {"model_name": self.model_name, "best_epoch": self.best_epoch, "best_metric": self.best_metric,
+                  "metric_for_best": self.metric_for_best, "epochs_ran": len(self.history), "history": self.history,
+                  "validation": metrics, "snr_breakdown": breakdown, "val_loss": val_loss,
+                  "parameters": total_p, "trainable": train_p, "test_evaluated": False, "test": {},
+                  "initialization": "unchanged Review-3 constructors; no external pretrained checkpoint loaded",
+                  "checkpoint_sha256": hashlib.sha256((self.checkpoint_dir/"best.pt").read_bytes()).hexdigest()}
+        write_json(self.checkpoint_dir/"results.json", result)
+        write_json(self.checkpoint_dir/"status.json", {"status": "complete", "best_epoch": self.best_epoch,
+                   "epochs_ran": len(self.history), "validation": metrics})
+        return result

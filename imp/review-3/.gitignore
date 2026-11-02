@@ -6,3 +6,9 @@ checkpoints/
 *.npy
 logs/*.log
 .pytest_cache/
+
+# Generated artifacts for the CE-only group-config rerun.
+logs/group_*
+logs/smoke_*
+logs/model_source_hashes_*
+*.npz
