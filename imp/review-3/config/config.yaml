@@ -1,0 +1,141 @@
+# Cấu hình chung cho toàn bộ dự án Review-3
+dataset:
+  name: mixture-36l
+  data_root: D:\content\mix-dataset
+  duration: 4.0
+  sample_rate: 16000
+  num_classes: 36
+  snr_levels: [-5.0, 0.0, 5.0, 10.0, 15.0, 20.0]
+  num_workers: 2
+
+# Tác vụ 2: Cấu hình nạp cache npy sau khi qua mask FRCRN
+noise_cache:
+  cache_dir: "cache/nhat"
+  cache_file: null  # Đường dẫn cụ thể tới file .npy (ví dụ: validation.npy)
+  apply_rms_norm: true
+  target_rms: 0.07925
+
+frontend:
+  sample_rate: 16000
+  n_fft: 512
+  win_length: 400
+  hop_length: 160
+  n_mels: 128
+  f_min: 20.0
+  f_max: 8000.0
+  num_frames: 398
+  log_eps: 1.0e-6
+  norm_eps: 1.0e-5
+  specaug_freq_masks: 2
+  specaug_freq_width: 16
+  specaug_time_masks: 2
+  specaug_time_width: 24
+
+training:
+  epochs: 30
+  batch_size: 32
+  eval_batch_size: 64
+  lr: 3.0e-4
+  weight_decay: 0.05
+  betas: [0.9, 0.999]
+  warmup_epochs: 2
+  min_lr_ratio: 0.01
+  label_smoothing: 0.1
+  grad_clip: 1.0
+  patience: 7
+  seed: 42
+  device: auto  # 'cuda', 'cpu', hoặc 'auto'
+
+logging:
+  log_dir: logs
+  checkpoint_dir: checkpoints
+  save_best: true
+  metric_for_best: macro_f1
+
+# Hồ sơ tái lập các thí nghiệm KD 21–27/10/2026.
+# Giữ cấu hình Review-3 phía trên; section này là manifest chia sẻ, chưa được
+# runner Review-3 tự động áp dụng. Runner KD dùng JSON + YAML gốc bên dưới.
+# Đường dẫn tương đối tính từ thư mục chứa file này. Sao chép cả thư mục config/unified.
+kd_experiments:
+  schema_version: 1
+  source_dir: SNR_Aware/FRCRN_KD_MoE/config/unified
+  usage: "Chọn train_*.json trong source_dir; sửa paths theo máy, chạy online_pipeline.py theo CLI của dự án KD. JSON ghi đè YAML."
+  local_paths_to_set: [dataset, frcrn_checkpoint, teacher_cache, frcrn_cache_dir, output]
+  optional_feature_paths: [teacher_hints, teacher_review, teacher_pooled]
+  dataset:
+    train_samples: 30240
+    validation_full_samples: 6480
+    validation_clean_samples: 3064
+    test_samples: 6480
+    clip_seconds: 4.0
+    sample_rate: 16000
+    num_classes: 36
+    snr_levels: [-5, 0, 5, 10, 15, 20]
+    clean_exclusion_file: SNR_Aware/FRCRN_KD_MoE/config/audioset_train_noise_ytids.txt
+  preprocessing:
+    input: frcrn_nhat_fp32_cache
+    frcrn_frozen: true
+    rms_normalize: 0.07925
+  teacher:
+    backbone: BEATs
+    crossfit_folds: 5
+    train_targets: out_of_fold
+    feature_dim: 768
+  training:
+    optimizer: AdamW
+    betas: [0.9, 0.999]
+    batch_size: 64
+    eval_batch_size: 64
+    stage1_epochs: 8
+    stage2_max_epochs: 50
+    patience: 8
+    seed: 2026
+    scheduler: cosine
+    min_lr: 1.0e-6
+    grad_clip: 1.0
+    ema_decay: 0.999
+    amp: bf16
+    label_smoothing: 0.1
+    selection: clean_validation_macro_acc_mean_per_snr
+  reporting:
+    split: validation
+    subset: clean
+    snr_db: all
+    expected_n: 3064
+    weights: best_raw
+    note: "Accuracy CSV khác macro_acc dùng chọn checkpoint; không thay thế hai chỉ số này cho nhau."
+  base_loss:
+    ce_weight: 1.0
+    kd_weight: 1.0
+    route_ce_weight: 1.0
+    front_weight: 1.0
+    front_lam_over: 2.0
+    cons_weight: 0.1
+    kd_weight_by_snr: false
+  methods:
+    logit_kd: {kd_target: logits, kd_weight: 1.0, temperatures: [2.0, 4.0]}
+    router_kd: {kd_target: router, kd_weight: 1.0, kd_temperature: 2.0, route_ce_weight: 0.0, groups: 4}
+    at_energy: {at_weight: 1000.0, at_loss: l2, teacher_layers: [6, 12], teacher_map: energy}
+    at_rollout: {at_weight: 1000.0, at_loss: l2, teacher_layers: [6, 12], teacher_map: rollout}
+    at_pearson: {at_weight: 2.0, at_loss: pearson, teacher_layers: [6, 12], teacher_map: rollout}
+    fitnets: {hint_weight: 100.0, teacher_layer: 6}
+    fitnets_ced_b10: {hint_weight: 10.0, teacher_layer: 6}
+    reviewkd: {review_weight: 1.0, warmup_epochs: 4, teacher_layers: [3, 6, 9, 12]}
+    spatial_spkd: {spatial_kd_weight: 24.0, spatial_kd_type: smooth_l1, spatial_exclude_diagonal: true}
+    spkd_mask: {spatial_kd_weight: 24.0, spatial_mask: true, spatial_mask_temperature: 0.5, spatial_mask_floor: 0.1}
+    spatial_cka: {spatial_kd_weight: 2.5, spatial_kd_type: cka}
+    sample_relation: {relation_kd_weight: 1.0}
+    crd_pooled: {crd_weight: 0.8, crd_level: pooled, crd_dim: 256, crd_temperature: 0.07, crd_negatives: 1024}
+    patchcrd: {crd_weight: 0.8, crd_level: patch, crd_proj_dim: 128, crd_temperature: 0.07, crd_n_data: 30240}
+    mgd: {fkd_method: mgd, fkd_weight: 7.0e-5, fkd_mask_ratio: 0.5, taps: [12]}
+    mgd_x10: {fkd_method: mgd, fkd_weight: 7.0e-4, fkd_mask_ratio: 0.5, taps: [12]}
+    vitkd: {fkd_method: vitkd, fkd_weight: 3.0e-5, fkd_gen_weight: 3.0e-6, fkd_mask_ratio: 0.5, taps: [1, 2, 12]}
+    vitkd_scaled: {fkd_method: vitkd, fkd_weight: 7.5e-8, fkd_gen_weight: 7.5e-9, fkd_mask_ratio: 0.5, taps: [1, 2, 12]}
+    qkv: {fkd_method: qkv, fkd_weight: 1.0, fkd_relation_heads: 8, qkv_block: 12}
+    qkv_w01: {fkd_method: qkv, fkd_weight: 0.1, fkd_relation_heads: 8, qkv_block: 12}
+    ced_spkd6: {fkd_method: spkd, fkd_weight: 24.0, taps: [6]}
+    ced_spkd12: {fkd_method: spkd, fkd_weight: 24.0, taps: [12]}
+    mgd_spkd12: {fkd_method: mgd_spkd, fkd_weight: 7.0e-5, fkd_spkd_weight: 24.0, fkd_mask_ratio: 0.5, taps: [12]}
+  ablations:
+    ce_only: {kd_weight: 0.0, auxiliary_kd_weight: 0.0}
+    spkd_only: {kd_weight: 0.0, note: "Giữ fkd_weight=24 của ced_spkd6 hoặc ced_spkd12."}

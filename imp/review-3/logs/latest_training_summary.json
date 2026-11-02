@@ -1,0 +1,137 @@
+[
+  {
+    "best_epoch": 1,
+    "best_metric": 0.0,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 3.5276730060577393,
+        "train_acc": 0.0,
+        "val_loss": 3.5911221504211426,
+        "val_metrics": {
+          "acc": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "macro_f1": 0.0,
+          "micro_f1": 0.0,
+          "mAP": 1.0
+        },
+        "snr_breakdown": {
+          "-5dB": {
+            "acc": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "macro_f1": 0.0,
+            "micro_f1": 0.0,
+            "mAP": 1.0
+          },
+          "0dB": {
+            "acc": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "macro_f1": 0.0,
+            "micro_f1": 0.0,
+            "mAP": 0.0
+          },
+          "5dB": {
+            "acc": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "macro_f1": 0.0,
+            "micro_f1": 0.0,
+            "mAP": 0.0
+          },
+          "10dB": {
+            "acc": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "macro_f1": 0.0,
+            "micro_f1": 0.0,
+            "mAP": 0.0
+          },
+          "15dB": {
+            "acc": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "macro_f1": 0.0,
+            "micro_f1": 0.0,
+            "mAP": 0.0
+          },
+          "20dB": {
+            "acc": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "macro_f1": 0.0,
+            "micro_f1": 0.0,
+            "mAP": 0.0
+          }
+        },
+        "epoch_time_s": 2.9162232875823975
+      }
+    ],
+    "test": {
+      "test_loss": 3.591108798980713,
+      "test_metrics": {
+        "acc": 0.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "macro_f1": 0.0,
+        "micro_f1": 0.0,
+        "mAP": 1.0
+      },
+      "test_snr": {
+        "-5dB": {
+          "acc": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "macro_f1": 0.0,
+          "micro_f1": 0.0,
+          "mAP": 1.0
+        },
+        "0dB": {
+          "acc": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "macro_f1": 0.0,
+          "micro_f1": 0.0,
+          "mAP": 0.0
+        },
+        "5dB": {
+          "acc": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "macro_f1": 0.0,
+          "micro_f1": 0.0,
+          "mAP": 0.0
+        },
+        "10dB": {
+          "acc": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "macro_f1": 0.0,
+          "micro_f1": 0.0,
+          "mAP": 0.0
+        },
+        "15dB": {
+          "acc": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "macro_f1": 0.0,
+          "micro_f1": 0.0,
+          "mAP": 0.0
+        },
+        "20dB": {
+          "acc": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "macro_f1": 0.0,
+          "micro_f1": 0.0,
+          "mAP": 0.0
+        }
+      }
+    },
+    "model_name": "pann_cnn10",
+    "log_file": "D:\\PROJECT\\MLNC\\imp\\review-3\\logs\\pann_cnn10_20261102_104437.log",
+    "params_m": 4.967268
+  }
+]
