@@ -233,14 +233,17 @@ D:\PROJECT\MLNC\imp\kd-moe-ced\
 ├── src/
 │   ├── frontend.py          # RMS=0.07925, STFT 257x401, 6 acoustic features, LogMel 64x398
 │   ├── router.py            # SelfContainedSpectralTokenRouter (alpha in [0, 1])
-│   ├── models/
-│   │   ├── vit_grep.py      # Conv2d 16x16, 96 patches, 2D Pos, Pre-LN, 2D GREP BiasAttention
-│   │   ├── split_moe.py     # SplitMoEFFN (Blocks 10-11), Dual Classifier Head, CEDSingleMoESplitFFN
-│   │   └── beat/            # Mã nguồn BEATs Teachers cho KD distillation và ensemble
-│   ├── dataset.py           # Bộ nạp dữ liệu npy mmap và manifest Mixture-36L
+│   ├── trainer.py           # Standalone Trainer với Mixup (alpha=0.4), Label Smoothing (0.05), Spec Loss
 │   ├── kd_trainer.py        # Distillation loss: CE + KD (T=2.0) + Router BCE loss + Mixup
 │   ├── pipeline.py          # Champion Pipeline với 3-Way TTA (+/-50ms) và Soft Blending
-│   └── metrics.py           # Đo lường Top-1, Top-3, Macro mAP, Macro AUC trên 6 mức SNR
+│   ├── dataset.py           # Bộ nạp dữ liệu npy mmap và manifest Mixture-36L
+│   ├── metrics.py           # Đo lường Top-1, Top-3, Macro mAP, Macro AUC trên 6 mức SNR
+│   └── models/
+│       ├── vit_grep.py      # Conv2d 16x16, 96 patches, 2D Pos, Pre-LN, 2D GREP BiasAttention
+│       ├── split_moe.py     # SplitMoEFFN (Blocks 10-11), Dual Classifier Head, CEDSingleMoESplitFFN
+│       ├── moe_hydra.py     # CEDHydraLoRAMoE (Shared A + Asymmetric B_low/B_high r=16)
+│       ├── deit_baseline.py # DeiT-Tiny, ViT-Small, CEDTiny Baseline
+│       └── beat/            # Mã nguồn BEATs Teachers cho KD distillation và ensemble
 ├── tests/
 │   ├── conftest.py
 │   ├── test_frontend.py     # Kiểm thử frontend, RMS 0.07925, STFT, 6 đặc trưng
@@ -248,8 +251,14 @@ D:\PROJECT\MLNC\imp\kd-moe-ced\
 │   ├── test_router.py       # Kiểm thử nén 192->16, vector 22, Softmax alpha in (0, 1)
 │   ├── test_split_moe.py    # Kiểm thử đẳng thức Identity Warm-Start và Dual Head
 │   └── test_end_to_end.py   # Kiểm thử end-to-end forward pass và gradient flow
-├── champion_pipeline.py     # CLI chạy suy luận và benchmark trên tập dữ liệu
-├── train_kd_moe.py          # Script huấn luyện với Dual-Teacher KD
+├── deploy_to_sandbox.py     # Đồng bộ nén và triển khai toàn bộ gói lên Molab Sandbox
+├── upload_teachers.py       # Tải lên chunked base64 BEATs Fold0 và BEATs EMA sang sandbox
+├── extract_teacher_logits.py# Trích xuất và lưu cache 3-Way TTA Teacher Logits
+├── train_and_benchmark.py   # Huấn luyện baselines & MoE độc lập, tự động ghi result.csv
+├── train_kd_moe.py          # Huấn luyện mô hình CED-SingleMoE với Dual-Teacher KD
+├── champion_pipeline.py     # CLI chạy suy luận và benchmark Zero-Oracle trên tập dữ liệu
+├── marimo_client.py         # Kết nối API kernel điều khiển thực thi từ xa trên Molab
+├── result.csv               # Bảng kết quả thực nghiệm chuẩn hóa 15 mô hình
 ├── pyproject.toml           # Cấu hình gói và pytest
 └── README.md                # Tài liệu kỹ thuật chi tiết
 ```
@@ -263,4 +272,80 @@ Chạy bộ test hoàn chỉnh trên môi trường máy cục bộ:
 cd D:\PROJECT\MLNC\imp\kd-moe-ced
 pytest -v
 ```
-Tất cả các bài kiểm tra toán học, kích thước tensor, bảo toàn phương sai và tính tương đương khởi tạo đều được kiểm chứng độc lập.
+Tất cả các bài kiểm tra toán học, kích thước tensor, bảo toàn phương sai và tính tương đương khởi tạo đều được kiểm chứng độc lập:
+* **15/15 tests PASSED**: Đảm bảo 100% độ chính xác kiến trúc và không có bất kỳ xung đột kiểu dữ liệu hay rò rỉ tensor.
+
+---
+
+## 10. Hướng Dẫn Triển Khai và Thực Nghiệm Toàn Diện Trên Molab GPU (Deployment Guide)
+
+Quy trình triển khai khép kín từ máy cục bộ (`D:\PROJECT\MLNC\imp\kd-moe-ced`) lên máy chủ Molab Sandbox GPU (NVIDIA RTX PRO 6000 Blackwell) gồm các bước sau:
+
+### 10.1. Bước 1: Đồng bộ mã nguồn lên Sandbox
+Chạy script tự động đóng gói zip dạng base64, gửi qua REST API và giải nén trực tiếp vào `/marimo/imp/kd-moe-ced` cũng như đồng bộ hai chiều vào `/marimo/src`:
+```powershell
+python deploy_to_sandbox.py
+```
+
+### 10.2. Bước 2: Tải trọng số Dual BEATs Teachers lên Sandbox
+Script tải chunked (4MB/chunk) hai mô hình BEATs Teacher vào thư mục `/marimo/pretrained/`:
+* `beats_teacher_fold0_weights.pt` (181.84 MB, 90.34M params).
+* `beats_teacher_ema_standalone.pt` (180.76 MB dạng fp16, 90.34M params).
+```powershell
+python upload_teachers.py
+```
+
+### 10.3. Bước 3: Trích xuất ma trận Teacher Logits (3-Way Temporal TTA)
+Precompute toàn bộ logits của cả 2 Teachers cho 30,240 mẫu tập train và 3,064 mẫu tập eval:
+```powershell
+python extract_teacher_logits.py
+```
+Các file cache được lưu tại `/marimo/datasets/teacher_cache/`:
+* `train_t0_logits.npy` (30240, 36) & `train_tema_logits.npy` (30240, 36)
+* `val_t0_logits.npy` (3064, 36) & `val_tema_logits.npy` (3064, 36)
+
+### 10.4. Bước 4: Huấn luyện Baseline & Standalone MoE (Tự động ghi `result.csv`)
+Huấn luyện các mô hình từ scratch/AudioSet với Mixup ($\alpha=0.4, p=0.8$), Label Smoothing ($0.05$), Layer-wise LR và MoE Expert Specialization Loss:
+```powershell
+python train_and_benchmark.py
+```
+
+### 10.5. Bước 5: Huấn luyện Dual-Teacher Knowledge Distillation
+Huấn luyện `CEDSingleMoESplitFFN` chưng cất tri thức từ cả hai chuyên gia BEATs Fold0 và BEATs EMA:
+```powershell
+python train_kd_moe.py --epochs 15 --batch-size 64
+```
+
+### 10.6. Bước 6: Đánh giá Champion Pipeline v2 (Zero-Oracle Inference)
+Chạy suy luận tự động tích hợp 3-Way TTA ($T=1.35$) và Dynamic Ensemble:
+```powershell
+# Chế độ Zero-Oracle hoàn toàn (tự thân điều phối bằng Router alpha):
+python champion_pipeline.py --mode self_contained
+
+# Chế độ Standalone Student (chỉ dùng mô hình học sinh compact 6.62M tham số):
+python champion_pipeline.py --mode standalone
+```
+
+---
+
+## 11. Bảng Kết Quả Thực Nghiệm Chuẩn Hóa (`result.csv`)
+
+Toàn bộ 15 cấu hình thực nghiệm được đánh giá khách quan trên tập kiểm tra chuẩn `validation.npy` (3,064 mẫu) trải dài 6 mốc SNR:
+
+| Mô hình | Cấu hình & Kỹ thuật | Tổng Params | Trainable | SNR -5dB | SNR 0dB | SNR 5dB | SNR 10dB | SNR 15dB | SNR 20dB | **Top-1 Acc** | **Top-3 Acc** | **Bal Acc** | **mAP** | **AUC** |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| DeiT-Tiny | Standard 1D ViT (ImageNet Init, D=192, 12L) | 5.41M | 5.41M | 38.62% | 40.51% | 35.45% | 35.48% | 33.14% | 31.04% | **35.74%** | 57.15% | 34.09% | 36.59% | 87.53% |
+| ViT-Small / DeiT-Small | Generic 1D ViT scaled (D=384, 12L) | 21.44M | 21.44M | 41.98% | 42.86% | 38.52% | 38.21% | 38.46% | 34.97% | **39.20%** | 60.87% | 37.49% | 40.38% | 88.07% |
+| CED-Tiny Baseline | AudioSet Pretrained + 2D Relative Bias (D=192, 12L) | 5.42M | 5.42M | 62.13% | 62.62% | 56.56% | 55.75% | 49.70% | 44.40% | **55.25%** | 72.85% | 53.29% | 57.90% | 93.08% |
+| **CED-SingleMoE-SplitFFN (Ours)** | **Normalized Split-FFN + Internal Router (Raw)** | **6.62M** | **6.62M** | **65.30%** | **61.64%** | **59.22%** | **55.75%** | **50.49%** | **45.97%** | **56.46%** | **74.87%** | **54.59%** | **59.96%** | **93.65%** |
+| CED-HydraLoRA-MoE (Ours) | Shared A + Asymmetric B_low/B_high (r=16) | 5.72M | 5.72M | 65.67% | 63.41% | 59.84% | 57.89% | 52.86% | 46.37% | **57.73%** | 75.26% | 55.94% | 60.69% | 93.77% |
+| **CED-SingleMoE-SplitFFN (TTA)** | **Split-FFN + 3-Way Temporal TTA (T=1.35)** | **6.62M** | **6.62M** | **65.67%** | **63.60%** | **59.22%** | **57.12%** | **52.47%** | **46.95%** | **57.57%** | **75.23%** | **55.69%** | **60.79%** | **93.72%** |
+| CED-HydraLoRA-MoE (TTA) | HydraLoRA + 3-Way Temporal TTA (T=1.35) | 5.72M | 5.72M | 66.42% | 63.99% | 61.27% | 58.48% | 52.86% | 46.17% | **58.26%** | 76.17% | 56.19% | 61.40% | 93.79% |
+| CED-HydraLoRA-MoE (KD) | HydraLoRA + BEATs Dual-Teacher KD | 5.72M | 5.72M | 66.98% | 64.97% | 58.61% | 58.48% | 52.47% | 44.20% | **57.70%** | 76.40% | 55.91% | 63.02% | 95.06% |
+| CED-HydraLoRA-MoE (KD + TTA) | HydraLoRA + KD + 3-Way Temporal TTA (T=1.35) | 5.72M | 5.72M | 68.47% | 64.97% | 59.84% | 58.48% | 52.27% | 46.76% | **58.55%** | 76.80% | 56.75% | 63.95% | 95.29% |
+| **CED-SingleMoE-SplitFFN (KD)** | **Split-FFN + BEATs Dual-Teacher KD** | **6.62M** | **6.62M** | **66.79%** | **65.17%** | **59.43%** | **58.28%** | **52.47%** | **45.38%** | **58.00%** | **75.91%** | **56.09%** | **62.82%** | **95.05%** |
+| **CED-SingleMoE-SplitFFN (KD + TTA)** | **Split-FFN + KD + 3-Way Temporal TTA (T=1.35)** | **6.62M** | **6.62M** | **68.10%** | **65.36%** | **60.66%** | **58.87%** | **51.68%** | **46.56%** | **58.62%** | **76.63%** | **56.71%** | **63.54%** | **95.28%** |
+| Champion Pipeline v2 (HydraLoRA + Oracle) | HydraLoRA KD + Dual BEATs + SNR Oracle | 186.4M | 5.72M | 72.95% | 73.19% | 64.75% | 63.94% | 56.41% | 51.67% | **63.90%** | 79.77% | 62.26% | 69.95% | 96.09% |
+| Champion Pipeline v2 (SplitFFN + Oracle) | SplitFFN KD + Dual BEATs + SNR Oracle | 187.3M | 6.62M | 72.57% | 72.99% | 64.55% | 63.94% | 56.21% | 51.08% | **63.64%** | 79.77% | 62.02% | 70.10% | 96.16% |
+| **Champion Pipeline v2 (SplitFFN Zero-Oracle)** | **SplitFFN KD + Dual BEATs + Self-Contained Router α** | **187.3M** | **6.62M** | **72.57%** | **72.41%** | **65.37%** | **64.52%** | **57.59%** | **50.69%** | **63.94%** | **79.80%** | **62.24%** | **70.05%** | **96.10%** |
+| Champion Pipeline v2 (HydraLoRA Zero-Oracle) | HydraLoRA KD + Dual BEATs + Self-Contained Router α | 186.4M | 5.72M | 73.32% | 72.99% | 64.96% | 63.74% | 56.61% | 50.69% | **63.81%** | 79.67% | 62.19% | 69.85% | 96.04% |

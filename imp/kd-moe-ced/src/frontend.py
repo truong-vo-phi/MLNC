@@ -1,28 +1,26 @@
 """
-Frontend Audio Processing and Acoustic Feature Extraction for Single-Backbone MoE.
+Xử lý Âm thanh Frontend và Trích xuất Đặc trưng Âm học cho Kiến trúc Single-Backbone MoE.
 
-This module implements:
-1. RMS Energy Normalization to sigma_0 = 0.07925.
-2. AcousticFeatureExtractor:
-   - STFT with 257 frequency bins and 401 time frames (16kHz, 4 seconds = 64,000 samples).
-   - 6 intrinsic physical/spectral morphology features (f_1 to f_6) for zero-oracle SNR estimation:
-     * f_1: Log-RMS energy
-     * f_2: Crest factor (peak amplitude to RMS ratio)
-     * f_3: Frame-wise energy kurtosis (detects speech leakage transients from FRCRN)
-     * f_4: Spectral Flatness (Wiener entropy: geometric mean / arithmetic mean)
-     * f_5: Low-band to Speech-band energy ratio (<300 Hz vs 300-3400 Hz)
-     * f_6: High-band to Speech-band energy ratio (>3400 Hz vs 300-3400 Hz)
-3. Log-Mel Spectrogram Frontend:
-   - 64 Mel filterbanks, 398 frames, sample-wise z-score normalization.
-4. SpecAugment: Frequency and Time masking.
+Module này thực hiện các nhiệm vụ:
+1. Chuẩn hóa Năng lượng RMS về mức tham chiếu sigma_0 = 0.07925 (~ -22.02 dBFS).
+2. Trích xuất đặc trưng âm học vật lý (AcousticFeatureExtractor):
+   - Biến đổi STFT tuyến tính với 257 dải tần số và 401 khung thời gian (16kHz, 4 giây = 64,000 mẫu).
+   - 6 đặc trưng hình thái phổ và vật lý nội tại (f_1 đến f_6) phục vụ ước lượng SNR Zero-Oracle:
+     * f_1: Mức năng lượng Log-RMS.
+     * f_2: Hệ số đỉnh Crest factor (tỷ số giữa biên độ cực đại và RMS).
+     * f_3: Hệ số nhọn năng lượng khung thời gian (Temporal Kurtosis - phát hiện xung đột biến rò rỉ tiếng nói từ FRCRN).
+     * f_4: Độ phẳng phổ Spectral Flatness (Entropy Wiener: trung bình hình học / trung bình số học).
+     * f_5: Tỷ số năng lượng dải trầm so với dải thoại (<300 Hz so với 300-3400 Hz).
+     * f_6: Tỷ số năng lượng dải cao so với dải thoại (>3400 Hz so with 300-3400 Hz).
+3. Tầng Frontend Log-Mel Spectrogram:
+   - 64 dải lọc Mel, 398 khung thời gian, chuẩn hóa z-score độc lập cho từng mẫu.
+4. Tăng cường dữ liệu SpecAugment:
+   - Che dải tần số (Frequency Masking) và che dải thời gian (Time Masking).
 
-References:
-    - CED: Dinkel et al., "CED: Consistent Ensemble Distillation for Audio Tagging",
-      ICASSP 2024. arXiv:2308.11957.
-    - SpecAugment: Park et al., "SpecAugment: A Simple Data Augmentation Method
-      for Automatic Speech Recognition", Interspeech 2019. arXiv:1904.08779.
-    - Spectral Flatness & Acoustic Features: Peeters, "A large set of audio features
-      for sound description (similarity and classification) in the CUIDADO project", 2004.
+Tài liệu tham khảo:
+    - CED: Dinkel et al., "CED: Consistent Ensemble Distillation for Audio Tagging", ICASSP 2024. arXiv:2308.11957.
+    - SpecAugment: Park et al., "SpecAugment: A Simple Data Augmentation Method for ASR", Interspeech 2019. arXiv:1904.08779.
+    - Đơn vị đo âm học: Peeters, "A large set of audio features for sound description in the CUIDADO project", 2004.
 """
 
 from __future__ import annotations
@@ -35,22 +33,22 @@ import torch.nn.functional as F
 from torch import Tensor
 
 RMS_EPS = 1e-8
-TARGET_RMS = 0.07925  # Standardized acoustic energy reference level (~ -22.02 dBFS)
+TARGET_RMS = 0.07925  # Mức năng lượng âm học tham chiếu chuẩn hóa (~ -22.02 dBFS)
 
 
 def rms_normalize(waveform: Tensor, target_rms: float = TARGET_RMS) -> Tensor:
     """
-    Standardize waveform energy to a constant reference level target_rms (0.07925).
+    Chuẩn hóa mức năng lượng hiệu dụng RMS của sóng âm về mức tham chiếu cố định target_rms (0.07925).
 
-    Why target_rms = 0.07925?
-    - Corresponds to 20 * log10(0.07925) ~= -22.02 dBFS RMS, the empirical median energy level
-      of clean speech and background noise in AudioSet / FSD50K audio tagging benchmarks.
-    - Invariance: Guarantees that acoustic features (especially Log-RMS, Crest factor, and
-      sub-band energy integrals) reflect true spectral distribution and transient morphology
-      rather than trivial playback gain or recording volume variations.
-    - Stability: Prevents gradient explosion or vanishing in early Conv2d patch projection layers.
+    Tại sao lại chọn target_rms = 0.07925?
+    - Tương ứng với 20 * log10(0.07925) ~= -22.02 dBFS RMS, mức năng lượng trung vị thực nghiệm
+      của tiếng nói sạch và nhiễu môi trường trong các bộ dữ liệu quy chuẩn AudioSet / FSD50K.
+    - Tính bất biến (Invariance): Đảm bảo các đặc trưng âm học sau đó (Log-RMS, Crest factor,
+      và tích phân năng lượng các dải tần) phản ánh cấu trúc phổ thật sự thay vì phụ thuộc vào
+      âm lượng thu âm hoặc khoảng cách micro.
+    - Tính ổn định (Stability): Chống hiện tượng bùng nổ hoặc tiêu biến gradient ở tầng tích chập patch Conv2d đầu tiên.
 
-    Formula:
+    Công thức:
         x_norm = x * [target_rms / (sqrt(mean(x^2)) + eps)]
     """
     rms = waveform.square().mean(dim=-1).sqrt()
@@ -65,7 +63,7 @@ def create_htk_mel_filterbank(
     f_max: float = 8000.0,
 ) -> Tensor:
     """
-    Construct standard HTK Mel Filterbank matrix identical to torchaudio / CED specification.
+    Xây dựng ma trận dải lọc HTK Mel Filterbank chuẩn hóa, tương thích 100% với đặc tả của torchaudio và CED.
     """
     min_mel = 2595.0 * np.log10(1.0 + f_min / 700.0)
     max_mel = 2595.0 * np.log10(1.0 + f_max / 700.0)
@@ -83,16 +81,15 @@ def create_htk_mel_filterbank(
 
 class LogMel(nn.Module):
     """
-    Pure PyTorch Log-Mel Spectrogram Frontend matching the CED specification:
-    - Sample rate: 16 kHz
-    - FFT: 512, Win length: 400, Hop length: 160
-    - Mel bins: 64, Frequency range: 20 Hz - 8000 Hz
-    - Number of output frames: 398
-    - Instance normalization: Per-sample z-score normalization over (time, frequency)
+    Tầng Frontend trích xuất phổ Log-Mel Spectrogram thuần PyTorch tương thích với CED:
+    - Tần số lấy mẫu: 16 kHz
+    - STFT: n_fft = 512, win_length = 400, hop_length = 160
+    - Số dải Mel: 64, Dải tần số: 20 Hz - 8000 Hz
+    - Số khung thời gian đầu ra: 398 frames
+    - Chuẩn hóa z-score độc lập từng mẫu trên cả hai chiều không gian (thời gian, tần số).
 
-    Reference:
-        Dinkel et al., "CED: Consistent Ensemble Distillation for Audio Tagging",
-        ICASSP 2024. arXiv:2308.11957.
+    Tài liệu tham khảo:
+        Dinkel et al., "CED: Consistent Ensemble Distillation for Audio Tagging", ICASSP 2024. arXiv:2308.11957.
     """
     def __init__(
         self,
@@ -122,9 +119,10 @@ class LogMel(nn.Module):
         self.register_buffer("mel_fb", mel_fb)
 
     def logmel(self, waveform: Tensor) -> Tensor:
+        """Tính toán phổ Log-Mel từ sóng âm đầu vào."""
         if self.pad:
             waveform = F.pad(waveform, (0, self.pad))
-        # STFT computation
+        # Thực hiện biến đổi STFT
         stft = torch.stft(
             waveform,
             n_fft=self.n_fft,
@@ -135,17 +133,19 @@ class LogMel(nn.Module):
             return_complex=True,
         )
         power = stft.abs().square()  # [B, n_fft // 2 + 1, Frames]
-        # Mel matrix multiplication: [n_mels, n_freqs] @ [B, n_freqs, Frames] -> [B, n_mels, Frames]
+        # Nhân ma trận bộ lọc Mel: [n_mels, n_freqs] @ [B, n_freqs, Frames] -> [B, n_mels, Frames]
         mel = torch.matmul(self.mel_fb, power)
         return (mel + self.log_eps).log()
 
     def _offsets(self, frames: int, batch: int, device: torch.device) -> Tensor:
+        """Sinh vị trí cắt khung thời gian (ngẫu nhiên khi huấn luyện, cắt giữa khi kiểm tra)."""
         limit = frames - self.num_frames
         if self.training and limit > 0:
             return torch.randint(0, limit + 1, (batch,), device=device)
         return torch.full((batch,), max(limit, 0) // 2, dtype=torch.long, device=device)
 
     def _crop(self, x: Tensor, offsets: Tensor) -> Tensor:
+        """Cắt ma trận phổ về đúng độ dài khung chuẩn num_frames (398)."""
         frames = x.shape[-1]
         if frames <= self.num_frames:
             return x
@@ -153,8 +153,12 @@ class LogMel(nn.Module):
         return x.gather(2, index[:, None, :].expand(-1, x.shape[1], -1))
 
     def forward(self, waveform: Tensor) -> Tensor:
+        """
+        Đầu vào: waveform [B, 64000]
+        Đầu ra: Log-Mel spectrogram [B, 1, 64, 398] đã chuẩn hóa z-score.
+        """
         x = self.logmel(waveform)
-        # Sample-wise z-score normalization across frequency and time
+        # Chuẩn hóa z-score cho từng mẫu qua cả chiều tần số và thời gian
         mean = x.mean(dim=(-2, -1), keepdim=True)
         std = x.std(dim=(-2, -1), keepdim=True)
         x = (x - mean) / (std + self.norm_eps)
@@ -163,11 +167,10 @@ class LogMel(nn.Module):
 
 class SpecAugment(nn.Module):
     """
-    Frequency and Time Masking SpecAugment for robust audio transformer training.
+    Kỹ thuật tăng cường dữ liệu SpecAugment che dải tần số và thời gian.
 
-    Reference:
-        Park et al., "SpecAugment: A Simple Data Augmentation Method for ASR",
-        Interspeech 2019. arXiv:1904.08779.
+    Tài liệu tham khảo:
+        Park et al., "SpecAugment: A Simple Data Augmentation Method for ASR", Interspeech 2019. arXiv:1904.08779.
     """
     def __init__(
         self,
@@ -184,6 +187,7 @@ class SpecAugment(nn.Module):
 
     @staticmethod
     def _zero_band(x: Tensor, sample: int, dim: int, width: int) -> None:
+        """Che về 0 một dải ngẫu nhiên trên chiều dim chỉ định."""
         size = x.shape[dim]
         w = int(torch.randint(0, width + 1, (1,)).item())
         if w == 0 or w > size:
@@ -195,6 +199,7 @@ class SpecAugment(nn.Module):
             x[sample, :, :, start : start + w] = 0
 
     def forward(self, x: Tensor) -> Tensor:
+        """Áp dụng che dải (chỉ kích hoạt khi đang ở chế độ huấn luyện training=True)."""
         if not self.training or (self.freq_masks == 0 and self.time_masks == 0):
             return x
         x = x.clone()
@@ -208,30 +213,30 @@ class SpecAugment(nn.Module):
 
 class AcousticFeatureExtractor(nn.Module):
     """
-    Extract 6 intrinsic physical, spectral, and statistical morphology features from waveform:
-    Input: Normalized waveform n_hat of length 4.0s (64,000 samples at 16 kHz).
-    STFT:
-        - n_fft = 512 -> 257 frequency bins (0 to 8000 Hz, delta_f = 31.25 Hz).
-        - hop_length = 160 -> 10 ms step.
-        - win_length = 512 with center=True -> 401 time frames (1 + 64000 / 160).
-        - Generates linear power spectrogram P(f, t) of shape [B, 257, 401].
+    Trích xuất 6 đặc trưng vật lý, phổ và hình thái thống kê trực tiếp từ sóng âm:
+    Đầu vào: Sóng âm đã chuẩn hóa n_hat độ dài 4.0 giây (64,000 mẫu tại 16 kHz).
+    Biến đổi STFT:
+        - n_fft = 512 -> 257 dải tần số tuyến tính (0 đến 8000 Hz, delta_f = 31.25 Hz).
+        - hop_length = 160 -> bước nhảy 10 ms.
+        - win_length = 512 với center=True -> 401 khung thời gian (1 + 64000 / 160).
+        - Sinh ra phổ công suất tuyến tính P(f, t) kích thước [B, 257, 401].
 
-    The 6 Features [f_1, f_2, f_3, f_4, f_5, f_6]:
-        1. f_1 (Log-RMS): Total signal energy level.
-        2. f_2 (Crest Factor): Peak amplitude / RMS ratio. Detects impulsive bursts.
-        3. f_3 (Temporal Kurtosis): Frame-wise energy distribution peakedness.
-           In stationary environmental noise, kurtosis ~= 3. When FRCRN speech leakage
-           occurs in isolated syllables, kurtosis spikes dramatically (>> 3).
-        4. f_4 (Spectral Flatness): Geometric mean / arithmetic mean of power spectrum across
-           frequencies (Wiener entropy). High (~1) for white/pink noise; low (<<1) for harmonic speech.
-        5. f_5 (Low-band Energy Ratio): Log energy ratio of <300 Hz relative to speech band 300-3400 Hz.
-           (Bins 0..9 vs Bins 10..108).
-        6. f_6 (High-band Energy Ratio): Log energy ratio of >3400 Hz relative to speech band 300-3400 Hz.
-           (Bins 109..256 vs Bins 10..108).
+    6 Đặc trưng Âm học Vật lý [f_1, f_2, f_3, f_4, f_5, f_6]:
+        1. f_1 (Log-RMS): Mức năng lượng tổng thể của tín hiệu sau chuẩn hóa.
+        2. f_2 (Crest Factor): Tỷ số giữa biên độ cực đại và năng lượng hiệu dụng. Nhận diện xung kích đột biến.
+        3. f_3 (Temporal Kurtosis): Hệ số nhọn bậc 4 của năng lượng khung theo thời gian.
+           Nhiễu môi trường nền có kurtosis xấp xỉ 3. Khi bộ khử nhiễu FRCRN làm rò rỉ âm tiết tiếng nói
+           ngắt quãng ở SNR cao, Kurtosis sẽ tăng đột biến (>> 3).
+        4. f_4 (Spectral Flatness): Tỷ số trung bình hình học trên trung bình số học (Entropy Wiener).
+           Xấp xỉ 1 đối với nhiễu phẳng (nhiễu trắng/hồng); rất nhỏ (<< 1) khi có cấu trúc họa âm tiếng người.
+        5. f_5 (Low-band Energy Ratio): Tỷ số log năng lượng dải trầm (<300 Hz, bins 0..9)
+           so với dải thoại người (300-3400 Hz, bins 10..108).
+        6. f_6 (High-band Energy Ratio): Tỷ số log năng lượng dải cao (>3400 Hz, bins 109..256)
+           so với dải thoại người (300-3400 Hz, bins 10..108).
 
-    Why this design?
-        These 6 metrics directly quantify physical distortion and speech leakage artifacts
-        without requiring clean ground-truth speech or Oracle SNR!
+    Ý nghĩa:
+        Cung cấp thước đo định lượng biến dạng vật lý và tàn dư rò rỉ tiếng nói từ FRCRN
+        mà không đòi hỏi nhãn SNR Oracle hay tín hiệu tiếng nói gốc!
     """
     def __init__(self, n_fft: int = 512, hop_length: int = 160) -> None:
         super().__init__()
@@ -241,8 +246,8 @@ class AcousticFeatureExtractor(nn.Module):
 
     def compute_stft_power(self, waveform: Tensor) -> Tensor:
         """
-        Compute linear power spectrogram P(f, t) with exact shape [B, 257, 401]
-        for a 64,000-sample input.
+        Tính toán ma trận mật độ phổ công suất tuyến tính P(f, t) kích thước [B, 257, 401]
+        tương ứng với đầu vào 64,000 mẫu âm thanh.
         """
         stft = torch.stft(
             waveform,
@@ -257,37 +262,41 @@ class AcousticFeatureExtractor(nn.Module):
         return power
 
     def forward(self, waveform: Tensor) -> Tensor:
+        """
+        Đầu vào: waveform [B, 64000]
+        Đầu ra: features [B, 6] tương ứng [f_1, f_2, f_3, f_4, f_5, f_6].
+        """
         B, T_len = waveform.shape
         eps = 1e-8
 
-        # 1. Log-RMS
+        # 1. f_1: Log-RMS
         rms = waveform.square().mean(dim=-1).clamp(min=eps).sqrt()
         log_rms = torch.log(rms + eps).unsqueeze(-1)  # [B, 1]
 
-        # 2. Crest factor: peak / rms
+        # 2. f_2: Hệ số đỉnh Crest factor (peak / rms)
         peak = waveform.abs().max(dim=-1).values
         crest_factor = (peak / (rms + eps)).unsqueeze(-1)  # [B, 1]
 
-        # Compute STFT power spectrum P(f, t) [B, 257, 401]
+        # Tính phổ công suất tuyến tính P(f, t) kích thước [B, 257, 401]
         power = self.compute_stft_power(waveform) + eps
 
-        # 3. Frame-wise energy kurtosis
+        # 3. f_3: Hệ số nhọn năng lượng khung thời gian (Temporal Kurtosis)
         frame_energy = power.sum(dim=1)  # [B, 401]
         mean_fe = frame_energy.mean(dim=-1, keepdim=True)
         std_fe = frame_energy.std(dim=-1, keepdim=True) + eps
         kurtosis = (((frame_energy - mean_fe) / std_fe) ** 4).mean(dim=-1, keepdim=True)  # [B, 1]
 
-        # 4. Spectral Flatness (Wiener entropy)
+        # 4. f_4: Độ phẳng phổ (Spectral Flatness / Wiener entropy)
         log_power = torch.log(power)
         geom_mean = torch.exp(log_power.mean(dim=1))  # [B, 401]
         arith_mean = power.mean(dim=1)                # [B, 401]
         flatness = (geom_mean / (arith_mean + eps)).mean(dim=-1, keepdim=True)  # [B, 1]
 
-        # 5 & 6. Sub-band energy ratios:
-        # Bin resolution: 16000 / 512 = 31.25 Hz
-        # Low-band (<300 Hz): bins 0..9 (0 to 312.5 Hz)
-        # Speech-band (300-3400 Hz): bins 10..108 (312.5 to 3406.25 Hz)
-        # High-band (>3400 Hz): bins 109..256 (3406.25 to 8000 Hz)
+        # 5 & 6. Tỷ số năng lượng dải tần số (Sub-band energy ratios):
+        # Độ phân giải dải tần: 16000 / 512 = 31.25 Hz/bin
+        # Dải trầm (<300 Hz): bins 0..9 (0 đến 312.5 Hz)
+        # Dải thoại tiếng nói (300-3400 Hz): bins 10..108 (312.5 đến 3406.25 Hz)
+        # Dải cao (>3400 Hz): bins 109..256 (3406.25 đến 8000 Hz)
         band_low = power[:, :10, :].sum(dim=(1, 2)) + eps
         band_speech = power[:, 10:109, :].sum(dim=(1, 2)) + eps
         band_high = power[:, 109:, :].sum(dim=(1, 2)) + eps

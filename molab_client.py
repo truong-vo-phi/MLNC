@@ -4,8 +4,8 @@ import sys
 import requests
 from pathlib import Path
 
-URL = "https://sb-d3f93608a9dca958.sb.molab.run"
-TOKEN = "cc93d32e13723437e102b78db105acc09bc41deae062f21ed920cb0e9035e4d9"
+URL = "https://sb-1f2f333bbf05f61f.sb.molab.run"
+TOKEN = "ffca46ee91177bf963ed3e88946f934b2a8b15a63fff65c41fd4a806d447844d"
 
 headers = {
     "Authorization": f"Bearer {TOKEN}",
@@ -34,8 +34,12 @@ def execute_code(code: str, timeout: int = 120):
         if line and line.startswith("data: "):
             payload = json.loads(line[6:])
             if "data" in payload and isinstance(payload["data"], str):
-                sys.stdout.write(payload["data"])
-                sys.stdout.flush()
+                try:
+                    sys.stdout.write(payload["data"])
+                    sys.stdout.flush()
+                except UnicodeEncodeError:
+                    sys.stdout.write(payload["data"].encode("ascii", errors="replace").decode("ascii"))
+                    sys.stdout.flush()
                 out.append(payload["data"])
     return "".join(out)
 

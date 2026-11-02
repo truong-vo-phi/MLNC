@@ -22,6 +22,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 RMS_EPS = 1e-8
+TARGET_RMS = 0.07925
 
 
 def rms_normalize(waveform: Tensor, target_rms: float = 0.07925) -> Tensor:
@@ -103,7 +104,7 @@ class LogMel(nn.Module):
             n_fft=self.n_fft,
             hop_length=self.hop_length,
             win_length=self.win_length,
-            window=self.window,
+            window=self.window.to(waveform.device),
             center=False,
             return_complex=True,
         )
@@ -208,7 +209,7 @@ class AcousticFeatureExtractor(nn.Module):
             n_fft=self.n_fft,
             hop_length=self.hop_length,
             win_length=self.n_fft,
-            window=self.window,
+            window=self.window.to(waveform.device),
             center=True,
             return_complex=True,
         )  # [B, F, Frames]

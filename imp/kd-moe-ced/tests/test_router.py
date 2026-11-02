@@ -1,13 +1,13 @@
 """
-Unit tests for Self-Contained Spectral-Token Router (Zero-Oracle SNR).
+Kiểm thử Đơn vị (Unit tests) cho Bộ định tuyến Phổ - Token Tự thân (Zero-Oracle SNR).
 
-Verifies:
-1. Token projection branch compresses CLS token from 192 to 16 dimensions.
-2. Concatenation of f_spec (6 dims) and token_h (16 dims) produces vector of 22 dims.
-3. MLP layer outputs 2 logits [r_low, r_high].
-4. Softmax yields continuous soft weight alpha in (0, 1).
-5. Target soft label function is strictly monotonic with SNR.
-6. Router BCE loss function behavior.
+Xác minh:
+1. Nhánh chiếu token nén CLS token từ 192 chiều xuống 16 chiều.
+2. Ghép nối f_spec (6 chiều) và token_h (16 chiều) tạo vector 22 chiều.
+3. Tầng MLP trả về 2 logits [r_low, r_high].
+4. Softmax sinh ra trọng số mềm liên tục alpha thuộc khoảng (0, 1).
+5. Hàm nhãn mục tiêu mềm tăng đơn điệu theo SNR.
+6. Hành vi tính toán của hàm mất mát Router BCE loss.
 """
 
 import torch
@@ -15,6 +15,7 @@ from src.router import SelfContainedSpectralTokenRouter
 
 
 def test_router_forward_shapes_and_values():
+    """Kiểm tra kích thước đầu ra và tính chất cổng mềm của Router."""
     router = SelfContainedSpectralTokenRouter(
         spectral_dim=6,
         token_dim=192,
@@ -28,41 +29,43 @@ def test_router_forward_shapes_and_values():
 
     alpha, gates = router(spectral_feat, intermediate_token)
 
-    # Check output shapes
+    # Kiểm tra kích thước tensor đầu ra
     assert alpha.shape == (B, 1)
     assert gates.shape == (B, 2)
 
-    # Soft gating properties:
-    # 1. Continuous range: alpha in (0, 1)
+    # Tính chất của cổng mềm:
+    # 1. Khoảng giá trị liên tục: alpha thuộc (0, 1)
     assert (alpha > 0.0).all() and (alpha < 1.0).all()
 
-    # 2. Sum to 1 across gates
+    # 2. Tổng xác suất bằng 1 trên 2 cổng
     assert torch.allclose(gates.sum(dim=-1), torch.ones(B), atol=1e-5)
 
-    # 3. alpha equals gates[:, 1:2]
+    # 3. alpha bằng đúng gates[:, 1:2]
     assert torch.allclose(alpha, gates[:, 1:2])
 
 
 def test_target_soft_label_monotonicity():
+    """Kiểm tra tính đơn điệu tăng ngặt của nhãn mục tiêu mềm theo mức SNR."""
     router = SelfContainedSpectralTokenRouter()
 
     snrs = torch.tensor([-5.0, 0.0, 5.0, 10.0, 15.0, 20.0])
     targets = router.compute_target_soft_label(snrs).squeeze(-1)
 
-    # Monotonicity check
+    # Kiểm tra tính đơn điệu
     for i in range(len(targets) - 1):
         assert targets[i] < targets[i + 1]
 
-    # Reference values:
-    # SNR = 15 dB is the midpoint -> target == 0.5
+    # Các mốc giá trị tham chiếu:
+    # SNR = 15 dB là điểm trung tâm chuyển tiếp -> target == 0.5
     assert torch.isclose(targets[4], torch.tensor(0.5), atol=1e-3)
-    # SNR = -5 dB is close to 0
+    # SNR = -5 dB tiến rất sát 0
     assert targets[0] < 0.01
-    # SNR = 20 dB is high (> 0.8)
+    # SNR = 20 dB rất cao (> 0.8)
     assert targets[5] > 0.85
 
 
 def test_router_bce_loss():
+    """Kiểm tra hàm mất mát BCE của router có giá trị không âm và không chứa NaN."""
     router = SelfContainedSpectralTokenRouter()
     alpha = torch.tensor([[0.1], [0.85]])
     snr = torch.tensor([-5.0, 20.0])

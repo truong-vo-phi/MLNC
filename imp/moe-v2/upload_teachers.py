@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 # Add imp/moe-v2 to path
-sys.path.insert(0, str(Path(__file__).resolve().parent / "imp" / "moe-v2"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import marimo_client
 
 def upload_file_chunked(
@@ -83,12 +83,13 @@ print(f"Verified remote file: {remote_path} -> {{sz:.2f}} MB")
 
 if __name__ == "__main__":
     t_start = time.time()
+    ROOT = Path(__file__).resolve().parents[2]
     # 1. Fold0 teacher
-    p_fold0 = Path("pretrained/beat-ft/beats_teacher_fold0_weights.pt")
+    p_fold0 = ROOT / "pretrained" / "beat-ft" / "beats_teacher_fold0_weights.pt"
     upload_file_chunked(p_fold0, "/marimo/pretrained/beats_teacher_fold0_weights.pt", chunk_size_bytes=4*1024*1024, as_fp16=False)
 
     # 2. EMA teacher (convert to fp16 to save 180MB of upload!)
-    p_ema = Path("pretrained/beat-ft/beats_teacher_ema_standalone.pt")
+    p_ema = ROOT / "pretrained" / "beat-ft" / "beats_teacher_ema_standalone.pt"
     upload_file_chunked(p_ema, "/marimo/pretrained/beats_teacher_ema_standalone.pt", chunk_size_bytes=4*1024*1024, as_fp16=True)
 
     print(f"\nAll teachers uploaded successfully in {time.time() - t_start:.1f}s!")

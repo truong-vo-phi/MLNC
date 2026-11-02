@@ -1,5 +1,11 @@
 """
-Evaluation metrics for 36-class acoustic classification broken down across SNR regimes.
+Các chỉ số đánh giá (Evaluation Metrics) cho bài toán phân loại âm thanh 36 lớp phân rã theo từng dải SNR.
+
+Bao gồm:
+- Top-1 và Top-3 Accuracy
+- Macro mAP (Mean Average Precision)
+- Macro AUC (Area Under ROC Curve)
+- Phân tích chi tiết theo dải SNR (-5dB, 0dB, 5dB, 10dB, 15dB, 20dB)
 """
 
 from __future__ import annotations
@@ -9,13 +15,14 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 
 
 def compute_topk_acc(preds: np.ndarray, targets: np.ndarray, k: int = 1) -> float:
+    """Tính toán độ chính xác Top-k (Top-k Accuracy)."""
     topk = np.argsort(preds, axis=-1)[:, -k:]
     hits = np.any(topk == targets[:, None], axis=-1)
     return float(np.mean(hits))
 
 
 def compute_map(preds: np.ndarray, targets: np.ndarray) -> float:
-    # Handle single-class or multi-class multi-hot target
+    """Tính toán Macro mAP (Mean Average Precision) trên toàn bộ 36 lớp."""
     num_classes = preds.shape[1]
     if targets.ndim == 1:
         y_true = np.zeros_like(preds)
@@ -32,6 +39,7 @@ def compute_map(preds: np.ndarray, targets: np.ndarray) -> float:
 
 
 def compute_auc(preds: np.ndarray, targets: np.ndarray) -> float:
+    """Tính toán Macro AUC (ROC Area Under Curve) trên toàn bộ các lớp có cả mẫu âm và mẫu dương."""
     num_classes = preds.shape[1]
     if targets.ndim == 1:
         y_true = np.zeros_like(preds)
@@ -55,7 +63,7 @@ def compute_snr_breakdown(
     snr_bins: tuple[int, ...] = (-5, 0, 5, 10, 15, 20),
 ) -> dict[str, dict[str, float]]:
     """
-    Compute accuracy and mAP broken down per SNR regime.
+    Tính toán phân rã hiệu năng chi tiết (Top-1, Top-3, mAP) theo từng mức SNR cụ thể và tổng thể.
     """
     results: dict[str, dict[str, float]] = {}
     for snr in snr_bins:
@@ -68,15 +76,14 @@ def compute_snr_breakdown(
             "top1": compute_topk_acc(sub_preds, sub_targets, k=1),
             "top3": compute_topk_acc(sub_preds, sub_targets, k=3),
             "map": compute_map(sub_preds, sub_targets),
-            "count": int(np.sum(mask)),
+            "count": float(np.sum(mask)),
         }
 
-    # Overall metrics across entire dataset
     results["overall"] = {
         "top1": compute_topk_acc(preds, targets, k=1),
         "top3": compute_topk_acc(preds, targets, k=3),
         "map": compute_map(preds, targets),
         "auc": compute_auc(preds, targets),
-        "count": len(targets),
+        "count": float(len(targets)),
     }
     return results

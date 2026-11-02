@@ -1,25 +1,22 @@
 """
-Vision Transformer Backbone with 2D Gated Relative Position Bias (GREP Attention).
+Backbone Vision Transformer với cơ chế 2D Gated Relative Position Bias (GREP Attention).
 
-Implements:
-1. Patch Projection: Conv2d 16x16, stride 16 (192 channels) -> 4 x 24 = 96 patches.
-2. 2D Positional Embedding + CLS Token -> Sequence length 97.
-3. Pre-LN Transformer Blocks:
-   - Branch 1: LayerNorm1 -> BiasAttention -> Residual 1
-   - Branch 2: LayerNorm2 -> MLP 192 -> 768 -> 192 (GELU) -> Residual 2
-4. 2D Gated Relative Position Bias (GREP):
-   - Shared relative distance bucket table (Block 0 owns, Blocks 1-11 reuse via SharedBias).
-   - Dynamic Gating: Query Q passes through Linear(64 -> 8) + Sigmoid -> g_a, g_b.
-   - Amplitude Modulation: S = g_a * (g_b * a - 1) + 2.
-   - Modulated Bias: B_attn = S * P_rel added to QK^T / sqrt(64) before Softmax.
+Bao gồm các thành phần:
+1. Chiếu Patch (Patch Projection): Conv2d 16x16, stride 16 (192 kênh) -> 4 x 24 = 96 patch tokens.
+2. 2D Positional Embedding + CLS Token -> Chuỗi token độ dài 97.
+3. Các khối Transformer chuẩn hóa trước (Pre-LN Transformer Blocks):
+   - Nhánh 1: LayerNorm1 -> BiasAttention -> Kết nối tắt Residual 1
+   - Nhánh 2: LayerNorm2 -> MLP 192 -> 768 -> 192 (kích hoạt GELU) -> Kết nối tắt Residual 2
+4. Cơ chế 2D Gated Relative Position Bias (GREP):
+   - Bảng nhúng khoảng cách tương đối 2D dùng chung (Khối 0 sở hữu, các Khối 1-11 tái sử dụng qua SharedBias).
+   - Cổng điều chế động (Dynamic Gating): Vector truy vấn Q đi qua Linear(64 -> 8) + Sigmoid -> g_a, g_b.
+   - Điều chế biên độ: S = g_a * (g_b * a - 1) + 2.
+   - Ma trận Bias điều chế: B_attn = S * P_rel cộng trực tiếp vào QK^T / sqrt(64) trước khi qua Softmax.
 
-References:
-    - CED: Dinkel et al., "CED: Consistent Ensemble Distillation for Audio Tagging",
-      ICASSP 2024. arXiv:2308.11957.
-    - BEATs: Chen et al., "BEATs: Audio Pre-Training with Acoustic Tokenizers",
-      ICML 2023. arXiv:2212.09058.
-    - DeiT: Touvron et al., "Training data-efficient image transformers & distillation
-      through attention", ICML 2021. arXiv:2012.12877.
+Tài liệu tham khảo:
+    - CED: Dinkel et al., "CED: Consistent Ensemble Distillation for Audio Tagging", ICASSP 2024. arXiv:2308.11957.
+    - BEATs: Chen et al., "BEATs: Audio Pre-Training with Acoustic Tokenizers", ICML 2023. arXiv:2212.09058.
+    - DeiT: Touvron et al., "Training data-efficient image transformers & distillation through attention", ICML 2021. arXiv:2012.12877.
 """
 
 from __future__ import annotations
@@ -36,25 +33,25 @@ CED_PREFIX = "encoder."
 
 
 class SharedBias:
-    """Shared container for relative position bias matrix computed once per forward pass."""
+    """Vật chứa (container) dùng chung cho ma trận bias vị trí tương đối, tính toán 1 lần duy nhất mỗi lượt forward."""
     def __init__(self) -> None:
         self.value: Tensor | None = None
 
 
 class BiasAttention(nn.Module):
     """
-    2D Gated Relative Position Bias Attention (GREP Attention).
-    3 attention heads, head_dim = 64 (total embed_dim = 192).
+    Cơ chế 2D Gated Relative Position Bias Attention (GREP Attention).
+    Gồm 3 attention heads, head_dim = 64 (tổng embed_dim = 192).
 
-    Mathematical Formulation:
-        1. Query Q, Key K, Value V: [B, 3, 97, 64]
-        2. Shared Static 2D Relative Bias P_rel:
-           Constructed from 2D delta grid: delta_f in [-3, 3], delta_t in [-23, 23].
-           Block 0 owns the embedding tables; subsequent blocks reuse the shared tensor.
-        3. Dynamic GREP Gate:
-           gate = sigmoid(Linear_64->8(Q)) -> split into g_a, g_b in R^[B, 3, 97, 4]
-           scale S = g_a * (g_b * a - 1.0) + 2.0
-        4. Modulated Bias Matrix:
+    Công thức Toán học:
+        1. Vector Query Q, Key K, Value V: [B, 3, 97, 64]
+        2. Ma trận Bias Vị trí Tương đối 2D Tĩnh Dùng Chung P_rel:
+           Xây dựng từ lưới delta 2D: delta_f thuộc [-3, 3], delta_t thuộc [-23, 23].
+           Khối 0 sở hữu bảng nhúng; các khối tiếp theo tái sử dụng ma trận dùng chung này.
+        3. Cổng Điều Chế Động GREP:
+           gate = sigmoid(Linear_64->8(Q)) -> tách thành g_a, g_b thuộc R^[B, 3, 97, 4]
+           hệ số tỷ lệ S = g_a * (g_b * a - 1.0) + 2.0
+        4. Ma trận Bias Đã Điều Chế:
            B_attn = S * P_rel
         5. Scaled Dot-Product Attention:
            Attention(Q, K, V) = Softmax((Q K^T) / sqrt(64) + B_attn) V
@@ -99,14 +96,14 @@ class BiasAttention(nn.Module):
                 self.freq_rel_bias.weight.data.zero_()
                 self.time_rel_bias.weight.data.zero_()
 
-        # GREP dynamic gating linear layer (64 -> 8)
+        # Tầng tuyến tính cổng động GREP (64 -> 8)
         self.grep_linear = nn.Linear(self.head_dim, GATE_HIDDEN)
-        # Learnable gating scale parameter
+        # Hệ số tỷ lệ học được
         self.grep_a = nn.Parameter(torch.ones(1, self.num_heads, 1, 1))
 
     def compute_bias(self, device: torch.device) -> Tensor:
         """
-        Compute static 2D relative position bias matrix P_rel of shape [1, 3, 97, 97].
+        Tính toán ma trận bias vị trí tương đối 2D tĩnh P_rel kích thước [1, 3, 97, 97].
         """
         f_p, t_p = self.freq_patches, self.time_patches
         grid_f = torch.arange(f_p, device=device).unsqueeze(1).expand(f_p, t_p).reshape(-1)
@@ -125,21 +122,21 @@ class BiasAttention(nn.Module):
     def forward(self, x: Tensor, attn_mask: Tensor | None = None, is_causal: bool = False) -> Tensor:
         B, T, C = x.shape
         H, d = self.num_heads, self.head_dim
-        # QKV projection: [B, T, 3, H, d] -> [3, B, H, T, d]
+        # Chiếu QKV: [B, T, 3, H, d] -> [3, B, H, T, d]
         q, k, v = self.qkv(x).reshape(B, T, 3, H, d).permute(2, 0, 3, 1, 4)
 
         if hasattr(self, "freq_rel_bias"):
             self.shared.value = self.compute_bias(x.device)
         position_bias = self.shared.value
 
-        # Gated Relative Position Bias computation:
+        # Tính toán bias vị trí tương đối có điều chế cổng động (GREP):
         # q: [B, H, T, d] -> grep_linear(q): [B, H, T, 8]
         gate = torch.sigmoid(self.grep_linear(q).view(B, H, T, 2, GATE_HIDDEN // 2).sum(-1))
-        gate_a, gate_b = gate.chunk(2, dim=-1)  # Each: [B, H, T, 1] or [B, H, T, 2]
+        gate_a, gate_b = gate.chunk(2, dim=-1)
         scale = gate_a * (gate_b * self.grep_a - 1.0) + 2.0
         bias = (scale * position_bias).to(q.dtype) if position_bias is not None else None
 
-        # Scaled Dot-Product Attention with modulated relative bias
+        # Scaled Dot-Product Attention kèm ma trận bias đã điều chế
         out = F.scaled_dot_product_attention(
             q, k, v, attn_mask=bias, dropout_p=self.attn_drop.p if self.training else 0.0
         )
@@ -148,12 +145,12 @@ class BiasAttention(nn.Module):
 
 class ViTSBias(nn.Module):
     """
-    Vision Transformer Backbone with 2D Relative Position Bias matching CED-Tiny:
-    - 12 Transformer blocks with Pre-LN structure
-    - Embedding dimension: 192 (MLP dimension: 768, 295,872 parameters per MLP)
+    Backbone Vision Transformer với 2D Relative Position Bias tương thích CED-Tiny:
+    - 12 khối Transformer cấu trúc Pre-LN
+    - Số chiều embedding: 192 (chiều MLP: 768, 295,872 tham số mỗi MLP)
     - 3 Attention Heads (head_dim: 64)
-    - Patch grid: 4 frequency patches x 24 time patches = 96 patch tokens (+1 CLS = 97 tokens)
-    - Patch projection: Conv2d(1, 192, kernel_size=16, stride=16)
+    - Lưới Patch: 4 patch tần số x 24 patch thời gian = 96 patch tokens (+1 CLS token = 97 tokens)
+    - Chiếu Patch: Conv2d(1, 192, kernel_size=16, stride=16)
     """
     def __init__(
         self,
@@ -188,7 +185,7 @@ class ViTSBias(nn.Module):
         self.frames = frames
         self.shared = SharedBias()
 
-        # Replace standard attention with 2D GREP BiasAttention
+        # Thay thế attention tiêu chuẩn bằng 2D GREP BiasAttention
         for index, block in enumerate(self.vit.blocks):
             if use_bias:
                 block.attn = BiasAttention(
@@ -203,17 +200,17 @@ class ViTSBias(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         vit = self.vit
-        # Conv2d patch projection 16x16: [B, 1, 64, 384] -> [B, 192, 4, 24] -> [B, 96, 192]
+        # Chiếu patch Conv2d 16x16: [B, 1, 64, 384] -> [B, 192, 4, 24] -> [B, 96, 192]
         x = vit.patch_embed(x[..., : self.frames])
         x = x + vit.pos_embed[:, 1:]
         B, N, C = x.shape
         if self.time_major:
             x = x.view(B, self.freq_patches, self.time_patches, C).transpose(1, 2).reshape(B, N, C)
-        # Prepend CLS token -> [B, 97, 192]
+        # Ghép token CLS vào đầu chuỗi -> [B, 97, 192]
         cls = (vit.cls_token + vit.pos_embed[:, :1]).expand(B, -1, -1)
         x = vit.norm_pre(vit.pos_drop(torch.cat([cls, x], dim=1)))
         self.shared.value = None
-        # Forward through Transformer blocks 0 to 11
+        # Truyền qua lần lượt các khối Transformer từ 0 đến 11
         x = vit.blocks(x)
         x = vit.norm(x)
         return vit.forward_head(x)
@@ -221,7 +218,7 @@ class ViTSBias(nn.Module):
 
 def load_ced_tiny(model: ViTSBias, repo: str = CED_REPO, path: str | None = None) -> dict[str, int]:
     """
-    Initialize model weights from the official AudioSet pre-trained CED-Tiny checkpoint.
+    Khởi tạo trọng số mô hình từ checkpoint tiền huấn luyện AudioSet chính thức của CED-Tiny.
     """
     from huggingface_hub import hf_hub_download
     from safetensors.torch import load_file
@@ -230,7 +227,7 @@ def load_ced_tiny(model: ViTSBias, repo: str = CED_REPO, path: str | None = None
         local = path or hf_hub_download(repo, "model.safetensors")
         state = load_file(local)
     except Exception as exc:
-        print(f"Warning: Could not download CED-Tiny weights ({exc}). Using initialized weights.")
+        print(f"Cảnh báo: Không thể tải trọng số CED-Tiny ({exc}). Sử dụng trọng số khởi tạo ngẫu nhiên.")
         return {"loaded_tensors": 0, "total_tensors": 0, "missing": 0}
 
     vit = model.vit

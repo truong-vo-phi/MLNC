@@ -1,11 +1,10 @@
 # ==============================================================================
-# Configuration: Single-Backbone Mixture-of-Experts (MoE) v2 for Noise-Robust Audio Classification
+# Cấu hình: Single-Backbone Mixture-of-Experts (MoE) v2 Phân loại Âm thanh Kháng Nhiễu
 #
-# References:
+# Tài liệu tham khảo:
 #   - V-MoE: Riquelme et al., "Scaling Vision with Sparse Mixture of Experts", NeurIPS 2021. arXiv:2106.05974
 #   - Soft MoE: Puigcerver et al., "From Sparse to Soft Mixtures of Experts", ICLR 2024. arXiv:2308.00951
 #   - DeepSeekMoE: Dai et al., "DeepSeekMoE: Towards Ultimate Expert Specialization in MoE", ACL 2024. arXiv:2401.06066
-#   - HydraLoRA: Tian et al., "HydraLoRA: An Asymmetric LoRA Architecture for Efficient Fine-Tuning", NeurIPS 2024 Oral. arXiv:2404.19245
 #   - CED: Dinkel et al., "CED: Consistent Ensemble Distillation for Audio Tagging", ICASSP 2024. arXiv:2308.11957
 #   - BEATs: Chen et al., "BEATs: Audio Pre-Training with Acoustic Tokenizers", ICML 2023. arXiv:2212.09058
 #   - DeiT: Touvron et al., "Training data-efficient image transformers & distillation through attention", ICML 2021. arXiv:2012.12877
@@ -49,51 +48,57 @@ specaugment:
 ced_tiny:
   arch: "deit_tiny_patch16_224"
   embed_dim: 192
-  depth: 12
+  mlp_dim: 768
   num_heads: 3
-  mlp_ratio: 4.0
-  dropout: 0.0
-  attn_dropout: 0.0
-  drop_path: 0.0
-  bias_init: "zero"
+  head_dim: 64
+  num_blocks: 12
+  patch_size: [16, 16]
+  patch_stride: [16, 16]
+  num_patches: 96
+  seq_len: 97
   use_bias: true
   time_major: false
-  hybrid_pool: false
-  ced_repo: "mispeech/ced-tiny"
-
-moe_split:
-  split_blocks: [10, 11]
-  num_routed_experts: 2
-  use_shared_expert: true
-  shared_expert_ratio: 1.0
-  router_hidden_dim: 64
-  temperature: 1.0
-
-moe_hydra:
-  target_blocks: [6, 7, 8, 9, 10, 11]
-  lora_rank: 16
-  lora_alpha: 16.0
-  num_routed_experts: 2
-  router_hidden_dim: 64
+  pretrained_repo: "mispeech/ced-tiny"
 
 router:
-  feature_dim: 6
+  spectral_dim: 6
+  token_dim: 192
+  token_proj_dim: 16
   hidden_dim: 32
   transition_center_db: 15.0
   transition_tau: 2.5
-  lambda_route_loss: 0.20
+  supervised: true
+
+split_moe:
+  split_blocks: [10, 11]
+  shared_expert_weight: 0.50
+  routed_expert_weight: 0.50
+  warm_start_identity: true
+  num_routed_experts: 2
+
+dual_classifier:
+  in_features: 192
+  num_classes: 36
+  blending: "soft_convex"
 
 training:
-  batch_size: 128
   epochs: 15
-  lr_backbone: 5.0e-5
-  lr_experts: 1.5e-4
+  batch_size: 64
+  lr_backbone: 4.0e-5
+  lr_experts: 1.2e-4
   lr_router: 2.0e-4
   weight_decay: 0.05
   warmup_epochs: 2
-  min_lr: 1.0e-6
   mixup_alpha: 0.4
   mixup_prob: 0.8
-  label_smoothing: 0.1
+  kd_temperature: 2.0
+  lambda_hard: 0.20
+  lambda_kd: 0.70
+  lambda_router: 0.10
   amp_dtype: "bfloat16"
-  grad_clip_norm: 1.0
+
+inference:
+  tta_shifts: [0, 800, -800]
+  t_student: 1.40
+  t_teacher: 1.20
+  ensemble_weight_student: 0.50

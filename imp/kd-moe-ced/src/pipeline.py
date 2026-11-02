@@ -1,16 +1,16 @@
 """
-Production Pipeline for Single-Backbone MoE (CEDSingleMoESplitFFN) with Dual BEATs Teachers.
+Pipeline Triển khai Thực tế (Production Pipeline) cho CEDSingleMoESplitFFN kết hợp Dual BEATs Teachers.
 
-Supports:
-1. Standalone Single-Backbone Student inference (Zero Oracle, ~6.62M params).
-2. Dynamic Zero-Oracle Ensemble with Dual BEATs Teachers:
-   - BEATs Fold0 (Clean/Environmental noise specialist)
-   - BEATs EMA (FRCRN speech-leakage specialist)
-   - Continuous soft interpolation using the internal router alpha in (0, 1).
-3. 3-Way Temporal TTA (+/-50ms = +/-800 samples at 16 kHz).
-4. Temperature Calibration (T_student = 1.40, T_teacher = 1.20).
+Hỗ trợ các tính năng:
+1. Suy luận Độc lập (Standalone Single-Backbone Student): Tự thân 100% Zero-Oracle (~6.62M tham số).
+2. Kết hợp Động (Dynamic Zero-Oracle Ensemble) với hai giáo viên BEATs:
+   - BEATs Fold0 (Chuyên gia nhận diện nhiễu môi trường SNR thấp).
+   - BEATs EMA (Chuyên gia khử rò rỉ tiếng nói FRCRN ở SNR cao).
+   - Nội suy mềm liên tục dựa trên trọng số alpha thuộc (0, 1) do bộ định tuyến nội tại sinh ra.
+3. Tăng cường thời điểm kiểm tra 3-Way Temporal TTA (+/-50ms = +/-800 mẫu ở 16 kHz).
+4. Hiệu chuẩn Nhiệt độ Bất đối xứng (Temperature Calibration: T_student = 1.40, T_teacher = 1.20).
 
-References:
+Tài liệu tham khảo:
     - Soft MoE: Puigcerver et al., ICLR 2024.
     - BEATs: Chen et al., ICML 2023.
     - CED: Dinkel et al., ICASSP 2024.
@@ -27,8 +27,13 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from src.models.beat import BEATClassifier, load_fold_teacher
+try:
+    from src.models.beat import BEATClassifier, load_fold_teacher
+except Exception:
+    BEATClassifier = None
+    load_fold_teacher = None
 from src.models.split_moe import CEDSingleMoESplitFFN
+
 
 
 def tta_forward(
@@ -39,8 +44,8 @@ def tta_forward(
     amp_dtype: torch.dtype = torch.bfloat16,
 ) -> tuple[Tensor, Tensor | None]:
     """
-    Forward pass with temporal shift.
-    Returns (logits, alpha) where alpha is router weight if model outputs it.
+    Thực hiện forward pass kèm dịch chuyển thời gian (temporal shift).
+    Trả về (logits, alpha) với alpha là trọng số định tuyến nếu mô hình hỗ trợ.
     """
     if shift_samples != 0:
         if shift_samples > 0:
@@ -67,12 +72,12 @@ def tta_forward(
 
 class ChampionPipeline:
     """
-    Production Champion Pipeline combining:
-    - Single-Backbone Student (CEDSingleMoESplitFFN)
-    - Optional Dual-Teachers: BEATs Fold0 & BEATs EMA
-    - Self-Contained Spectral-Token Router (alpha in [0, 1])
-    - 3-Way Temporal TTA (+/-50ms)
-    - Asymmetric Temperature Calibration (T_student=1.40, T_teacher=1.20)
+    Champion Pipeline kết hợp hoàn chỉnh:
+    - Mô hình học sinh độc lập (CEDSingleMoESplitFFN)
+    - Tùy chọn hai giáo viên (BEATs Fold0 & BEATs EMA)
+    - Bộ định tuyến Phổ - Token Tự thân (tính alpha thuộc [0, 1])
+    - Tăng cường thời điểm kiểm tra 3-Way Temporal TTA (+/-50ms)
+    - Hiệu chuẩn nhiệt độ bất đối xứng (T_student=1.40, T_teacher=1.20)
     """
 
     def __init__(
@@ -81,9 +86,9 @@ class ChampionPipeline:
         teacher_fold0: torch.nn.Module | None = None,
         teacher_ema: torch.nn.Module | None = None,
         device: torch.device | None = None,
-        student_temp: float = 1.40,
-        teacher_temp: float = 1.20,
-        student_weight: float = 0.25,
+        t_student: float = 1.40,
+        t_teacher: float = 1.20,
+        w_student: float = 0.25,
         t0_low: float = 0.45,
         tema_low: float = 0.30,
         t0_high: float = 0.30,
@@ -91,12 +96,11 @@ class ChampionPipeline:
     ) -> None:
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.student = student_model.to(self.device).eval()
-        self.t_fold0 = teacher_fold0.to(self.device).eval() if teacher_fold0 is not None else None
-        self.t_ema = teacher_ema.to(self.device).eval() if teacher_ema is not None else None
-
-        self.student_temp = student_temp
-        self.teacher_temp = teacher_temp
-        self.student_weight = student_weight
+        self.teacher_fold0 = teacher_fold0.to(self.device).eval() if teacher_fold0 else None
+        self.teacher_ema = teacher_ema.to(self.device).eval() if teacher_ema else None
+        self.t_student = t_student
+        self.t_teacher = t_teacher
+        self.w_student = w_student
         self.t0_low = t0_low
         self.tema_low = tema_low
         self.t0_high = t0_high
@@ -105,111 +109,137 @@ class ChampionPipeline:
     @torch.no_grad()
     def predict_student_tta(self, waveform: Tensor) -> tuple[np.ndarray, np.ndarray]:
         """
-        Run 3-way temporal TTA (0, +50ms, -50ms) on student model.
-        Returns (probs, alphas).
+        Dự đoán đầu ra của Student với kỹ thuật 3-Way Temporal TTA (0, +50ms, -50ms).
+        Trả về (probs_student, alphas).
         """
-        self.student.eval()
-        w = waveform.to(self.device)
-        shifts = [0, 800, -800]  # 50ms at 16kHz is 800 samples
+        shifts = [0, 800, -800]  # 800 mẫu tương ứng với 50ms tại tần số lấy mẫu 16 kHz
+        all_logits = []
+        all_alphas = []
 
-        logits_list, alphas_list = [], []
-        for s in shifts:
-            l, a = tta_forward(self.student, w, self.device, shift_samples=s)
-            logits_list.append(l)
-            if a is not None:
-                alphas_list.append(a)
+        for shift in shifts:
+            logits, alpha = tta_forward(self.student, waveform, self.device, shift_samples=shift)
+            all_logits.append(logits)
+            if alpha is not None:
+                all_alphas.append(alpha)
 
-        mean_logits = torch.stack(logits_list, dim=0).mean(dim=0)
-        p_student = F.softmax(mean_logits / self.student_temp, dim=-1).cpu().numpy()
+        # Lấy trung bình cộng logits qua 3 phép dịch chuyển
+        avg_logits = torch.stack(all_logits, dim=0).mean(dim=0)
+        # Áp dụng nhiệt độ hiệu chuẩn học sinh
+        probs = F.softmax(avg_logits / self.t_student, dim=-1).cpu().numpy()
 
-        if alphas_list:
-            mean_alpha = torch.stack(alphas_list, dim=0).mean(dim=0).cpu().numpy()
+        if all_alphas:
+            avg_alpha = torch.stack(all_alphas, dim=0).mean(dim=0).cpu().numpy()
         else:
-            mean_alpha = np.full((len(waveform), 1), 0.5)
+            avg_alpha = np.full((len(waveform), 1), 0.5, dtype=np.float32)
 
-        return p_student, mean_alpha
+        return probs, avg_alpha
+
+    @torch.no_grad()
+    def predict_teacher_blended(
+        self,
+        waveform: Tensor,
+        alpha: np.ndarray,
+        cached_t0_logits: np.ndarray | None = None,
+        cached_tema_logits: np.ndarray | None = None,
+    ) -> np.ndarray:
+        """
+        Nội suy mềm phân phối xác suất của hai giáo viên theo trọng số alpha:
+        p_teacher = (1 - alpha) * p_fold0 + alpha * p_ema
+        """
+        if cached_t0_logits is not None and cached_tema_logits is not None:
+            l_t0 = torch.from_numpy(cached_t0_logits).to(self.device).float()
+            l_tema = torch.from_numpy(cached_tema_logits).to(self.device).float()
+            p_t0 = F.softmax(l_t0 / self.t_teacher, dim=-1).cpu().numpy()
+            p_tema = F.softmax(l_tema / self.t_teacher, dim=-1).cpu().numpy()
+        else:
+            assert self.teacher_fold0 is not None and self.teacher_ema is not None
+            shifts = [0, 800, -800]
+            l_t0_list, l_tema_list = [], []
+            for s in shifts:
+                l0, _ = tta_forward(self.teacher_fold0, waveform, self.device, shift_samples=s)
+                lema, _ = tta_forward(self.teacher_ema, waveform, self.device, shift_samples=s)
+                l_t0_list.append(l0)
+                l_tema_list.append(lema)
+            l_t0 = torch.stack(l_t0_list, dim=0).mean(dim=0)
+            l_tema = torch.stack(l_tema_list, dim=0).mean(dim=0)
+            p_t0 = F.softmax(l_t0 / self.t_teacher, dim=-1).cpu().numpy()
+            p_tema = F.softmax(l_tema / self.t_teacher, dim=-1).cpu().numpy()
+
+        a = alpha.reshape(-1, 1)
+        w_t0 = (1.0 - a) * self.t0_low + a * self.t0_high
+        w_tema = (1.0 - a) * self.tema_low + a * self.tema_high
+        return w_t0 * p_t0 + w_tema * p_tema
 
     @torch.no_grad()
     def predict_ensemble(
         self,
         waveform: Tensor,
-        cached_t0_logits: Tensor | np.ndarray | None = None,
-        cached_tema_logits: Tensor | np.ndarray | None = None,
+        cached_t0_logits: np.ndarray | None = None,
+        cached_tema_logits: np.ndarray | None = None,
+        p_student: np.ndarray | None = None,
+        alphas: np.ndarray | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         """
-        End-to-End Zero-Oracle Dynamic Ensemble:
-        Dynamically weights Teacher Fold0 and Teacher EMA according to router alpha.
+        Dự đoán tổng hợp Ensemble Zero-Oracle kết hợp Student và Dual-Teachers:
+        p_final = w_student * p_student + (1 - w_student) * p_teachers_blended
         """
-        p_student, alphas = self.predict_student_tta(waveform)
+        if p_student is None or alphas is None:
+            if len(waveform) > 0:
+                p_student, alphas = self.predict_student_tta(waveform)
+            else:
+                raise ValueError("Cần cung cấp waveform hoặc cặp (p_student, alphas).")
 
-        # Obtain teacher 0 probabilities
-        if cached_t0_logits is not None:
-            if isinstance(cached_t0_logits, np.ndarray):
-                cached_t0_logits = torch.from_numpy(cached_t0_logits)
-            p_t0 = F.softmax(cached_t0_logits.float().to(self.device) / self.teacher_temp, dim=-1).cpu().numpy()
-        elif self.t_fold0 is not None:
-            l_t0, _ = tta_forward(self.t_fold0, waveform.to(self.device), self.device, shift_samples=0)
-            p_t0 = F.softmax(l_t0 / self.teacher_temp, dim=-1).cpu().numpy()
+        if cached_t0_logits is not None and cached_tema_logits is not None:
+            l_t0 = torch.from_numpy(cached_t0_logits).to(self.device).float()
+            l_tema = torch.from_numpy(cached_tema_logits).to(self.device).float()
+            p_t0 = F.softmax(l_t0 / self.t_teacher, dim=-1).cpu().numpy()
+            p_tema = F.softmax(l_tema / self.t_teacher, dim=-1).cpu().numpy()
         else:
-            p_t0 = p_student
+            assert self.teacher_fold0 is not None and self.teacher_ema is not None
+            shifts = [0, 800, -800]
+            l_t0_list, l_tema_list = [], []
+            for s in shifts:
+                l0, _ = tta_forward(self.teacher_fold0, waveform, self.device, shift_samples=s)
+                lema, _ = tta_forward(self.teacher_ema, waveform, self.device, shift_samples=s)
+                l_t0_list.append(l0)
+                l_tema_list.append(lema)
+            l_t0 = torch.stack(l_t0_list, dim=0).mean(dim=0)
+            l_tema = torch.stack(l_tema_list, dim=0).mean(dim=0)
+            p_t0 = F.softmax(l_t0 / self.t_teacher, dim=-1).cpu().numpy()
+            p_tema = F.softmax(l_tema / self.t_teacher, dim=-1).cpu().numpy()
 
-        # Obtain teacher EMA probabilities
-        if cached_tema_logits is not None:
-            if isinstance(cached_tema_logits, np.ndarray):
-                cached_tema_logits = torch.from_numpy(cached_tema_logits)
-            p_tema = F.softmax(cached_tema_logits.float().to(self.device) / self.teacher_temp, dim=-1).cpu().numpy()
-        elif self.t_ema is not None:
-            l_tema, _ = tta_forward(self.t_ema, waveform.to(self.device), self.device, shift_samples=0)
-            p_tema = F.softmax(l_tema / self.teacher_temp, dim=-1).cpu().numpy()
-        else:
-            p_tema = p_student
+        a = alphas.reshape(-1, 1)
+        w_t0 = (1.0 - a) * self.t0_low + a * self.t0_high
+        w_tema = (1.0 - a) * self.tema_low + a * self.tema_high
+        p_final = self.w_student * p_student + w_t0 * p_t0 + w_tema * p_tema
 
-        # Soft dynamic weight computation based on router alpha:
-        # alpha -> 0: w_t0 = 0.45, w_tema = 0.30
-        # alpha -> 1: w_t0 = 0.30, w_tema = 0.45
-        w_t0 = (1.0 - alphas) * self.t0_low + alphas * self.t0_high
-        w_tema = (1.0 - alphas) * self.tema_low + alphas * self.tema_high
-        w_stu = self.student_weight
-
-        # Normalize weights so they sum to 1
-        total_w = w_stu + w_t0 + w_tema
-        w_stu = w_stu / total_w
-        w_t0 = w_t0 / total_w
-        w_tema = w_tema / total_w
-
-        p_final = w_stu * p_student + w_t0 * p_t0 + w_tema * p_tema
         return p_final, alphas
 
 
 def load_pipeline(
-    student_ckpt: Path | str | None = None,
+    student_ckpt: Path | str,
     teacher_fold0_ckpt: Path | str | None = None,
     teacher_ema_ckpt: Path | str | None = None,
     beat_config_path: Path | str | None = None,
     device: torch.device | None = None,
 ) -> ChampionPipeline:
-    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    """Nạp và khởi tạo toàn bộ pipeline hoàn chỉnh từ các file trọng số."""
+    dev = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    student = CEDSingleMoESplitFFN(num_classes=36, load_pretrained=False)
+    ckpt_path = Path(student_ckpt)
+    if ckpt_path.is_file():
+        state = torch.load(ckpt_path, map_location="cpu")
+        weights = state.get("model_state_dict", state)
+        student.load_state_dict(weights, strict=False)
+        print(f"Đã nạp thành công trọng số Student từ: {ckpt_path}")
 
-    student = CEDSingleMoESplitFFN(num_classes=36)
-    if student_ckpt and Path(student_ckpt).is_file():
-        ckpt = torch.load(student_ckpt, map_location="cpu")
-        state = ckpt.get("model_state_dict", ckpt)
-        student.load_state_dict(state, strict=False)
-        print(f"Loaded student weights from {student_ckpt}")
+    t0_model = None
+    tema_model = None
+    if teacher_fold0_ckpt and Path(teacher_fold0_ckpt).is_file():
+        assert beat_config_path is not None
+        t0_model = load_fold_teacher(teacher_fold0_ckpt, beat_config_path, dev)
+    if teacher_ema_ckpt and Path(teacher_ema_ckpt).is_file():
+        assert beat_config_path is not None
+        tema_model = load_fold_teacher(teacher_ema_ckpt, beat_config_path, dev)
 
-    t_fold0 = None
-    if teacher_fold0_ckpt and Path(teacher_fold0_ckpt).is_file() and beat_config_path:
-        t_fold0 = load_fold_teacher(teacher_fold0_ckpt, beat_config_path, device=device)
-        print(f"Loaded Teacher Fold0 from {teacher_fold0_ckpt}")
-
-    t_ema = None
-    if teacher_ema_ckpt and Path(teacher_ema_ckpt).is_file() and beat_config_path:
-        t_ema = load_fold_teacher(teacher_ema_ckpt, beat_config_path, device=device)
-        print(f"Loaded Teacher EMA from {teacher_ema_ckpt}")
-
-    return ChampionPipeline(
-        student_model=student,
-        teacher_fold0=t_fold0,
-        teacher_ema=t_ema,
-        device=device,
-    )
+    return ChampionPipeline(student, t0_model, tema_model, device=dev)

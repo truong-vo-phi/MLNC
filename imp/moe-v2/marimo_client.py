@@ -11,8 +11,8 @@ import urllib.error
 import urllib.request
 from typing import Iterator
 
-MARIMO_URL = "https://sb-f69e127a8595d1c6.sb.molab.run"
-MARIMO_TOKEN = "cfd8477208df21766d10051c990c71a18592ffb8a69611e636531aa3782cc8ed"
+MARIMO_URL = "https://sb-c04297299c79cc0d.sb.molab.run"
+MARIMO_TOKEN = "95900018fcf7379c970f9596ce7758087d253b3c7d0cca8040f51f30edc0729e"
 
 
 def get_session_id(url: str = MARIMO_URL, token: str = MARIMO_TOKEN) -> str:

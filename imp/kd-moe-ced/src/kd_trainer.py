@@ -1,8 +1,8 @@
 """
-Knowledge Distillation Engine for Single-Backbone MoE (CEDSingleMoESplitFFN).
-Dual-Teacher Distillation from BEATs-12L (Fold0 Clean/Noise & EMA FRCRN).
+Động cơ Huấn luyện Chưng cất Tri thức (Knowledge Distillation Engine) cho Single-Backbone MoE (CEDSingleMoESplitFFN).
+Thực hiện chưng cất tri thức kép (Dual-Teacher Distillation) từ BEATs-12L (Fold0 Clean/Noise & EMA FRCRN).
 
-References:
+Tài liệu tham khảo:
     - KD: Hinton et al., "Distilling the Knowledge in a Neural Network", NIPS 2014 Workshop.
     - Consistent Distillation: Beyer et al., "Knowledge Distillation: A Good Teacher is Patient and Consistent", CVPR 2022.
     - CED: Dinkel et al., "CED: Consistent Ensemble Distillation for Audio Tagging", ICASSP 2024.
@@ -37,8 +37,11 @@ def apply_mixup_with_teachers(
     temp: float = 2.0,
 ) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
     """
-    Apply Consistent Mixup data augmentation across waveforms, ground-truth labels,
-    continuous SNR values, and soft teacher distributions (Beyer et al., CVPR 2022).
+    Áp dụng kỹ thuật tăng cường Consistent Mixup đồng thời trên:
+    - Dạng sóng âm thanh (waveforms)
+    - Nhãn mục tiêu ground-truth (targets)
+    - Giá trị SNR liên tục (snr_db)
+    - Phân phối xác suất mềm của cả 2 giáo viên (Beyer et al., CVPR 2022)
     """
     p_t0 = F.softmax(t0_logits / temp, dim=-1)
     p_tema = F.softmax(tema_logits / temp, dim=-1)
@@ -61,9 +64,9 @@ def apply_mixup_with_teachers(
 
 class KDTrainer:
     """
-    Dual-Teacher Knowledge Distillation Trainer for Single-Backbone MoE.
-    Integrates soft teacher blending, expert specialization distillation,
-    dynamic router supervision, and cosine annealing schedule.
+    Trình quản lý Huấn luyện Chưng cất Tri thức Kép cho Single-Backbone MoE.
+    Tích hợp hòa trộn mềm giáo viên, chưng cất chuyên biệt hóa chuyên gia,
+    giám sát bộ định tuyến động, và lịch trình suy giảm tốc độ học hình cosine (Cosine Annealing).
     """
     def __init__(
         self,
@@ -79,202 +82,187 @@ class KDTrainer:
         warmup_epochs: int = 2,
         mixup_alpha: float = 0.4,
         mixup_prob: float = 0.8,
-        label_smoothing: float = 0.05,
-        lambda_kd: float = 0.65,
-        lambda_route: float = 0.20,
         kd_temperature: float = 2.0,
-        amp_dtype: str = "bfloat16",
-        out_dir: str | Path = "checkpoints",
+        lambda_hard: float = 0.20,
+        lambda_kd: float = 0.70,
+        lambda_router: float = 0.10,
+        out_dir: Path | str = "checkpoints",
     ) -> None:
         self.model = model.to(device)
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.device = device
         self.epochs = epochs
+        self.warmup_epochs = warmup_epochs
         self.mixup_alpha = mixup_alpha
         self.mixup_prob = mixup_prob
-        self.label_smoothing = label_smoothing
+        self.kd_temp = kd_temperature
+        self.lambda_hard = lambda_hard
         self.lambda_kd = lambda_kd
-        self.lambda_route = lambda_route
-        self.temp = kd_temperature
+        self.lambda_router = lambda_router
         self.out_dir = Path(out_dir)
         self.out_dir.mkdir(parents=True, exist_ok=True)
 
-        self.use_amp = device.type == "cuda"
-        self.amp_type = torch.bfloat16 if amp_dtype == "bfloat16" else torch.float16
-
-        # Parameter groups with differential learning rates
-        param_groups = self._build_param_groups(lr_backbone, lr_experts, lr_router, weight_decay)
-        self.optimizer = torch.optim.AdamW(param_groups)
-
-        total_steps = epochs * len(train_loader) if len(train_loader) > 0 else 1
-        warmup_steps = warmup_epochs * len(train_loader) if len(train_loader) > 0 else 1
-
-        def lr_lambda(step: int) -> float:
-            if step < warmup_steps:
-                return float(step + 1) / float(max(1, warmup_steps))
-            progress = float(step - warmup_steps) / float(max(1, total_steps - warmup_steps))
-            return 0.5 * (1.0 + math.cos(math.pi * progress))
-
-        self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda)
-        self.best_macro_acc = 0.0
         self.best_top1_acc = 0.0
-        self.best_results: dict[str, float] = {}
+        self.best_results: dict[str, Any] = {}
 
-    def _build_param_groups(
-        self, lr_backbone: float, lr_experts: float, lr_router: float, weight_decay: float
-    ) -> list[dict[str, Any]]:
-        backbone_params, expert_params, router_params = [], [], []
+        # Phân tách nhóm tham số và gán tốc độ học phân tầng (Layer-wise LR)
+        backbone_params = []
+        experts_params = []
+        router_params = []
 
         for name, param in self.model.named_parameters():
             if not param.requires_grad:
                 continue
-            if "router" in name or "acoustic_extractor" in name:
+            if "router" in name:
                 router_params.append(param)
-            elif (
-                "moe" in name
-                or "head_low" in name
-                or "head_high" in name
-                or "ffn_low" in name
-                or "ffn_high" in name
-                or "ffn_shared" in name
-            ):
-                expert_params.append(param)
+            elif "moe_blocks" in name or "head_low" in name or "head_high" in name:
+                experts_params.append(param)
             else:
                 backbone_params.append(param)
 
-        groups = []
-        if backbone_params:
-            groups.append({"params": backbone_params, "lr": lr_backbone, "weight_decay": weight_decay})
-        if expert_params:
-            groups.append({"params": expert_params, "lr": lr_experts, "weight_decay": weight_decay})
-        if router_params:
-            groups.append({"params": router_params, "lr": lr_router, "weight_decay": weight_decay})
+        self.optimizer = torch.optim.AdamW(
+            [
+                {"params": backbone_params, "lr": lr_backbone, "weight_decay": weight_decay},
+                {"params": experts_params, "lr": lr_experts, "weight_decay": weight_decay},
+                {"params": router_params, "lr": lr_router, "weight_decay": 1e-4},
+            ]
+        )
 
-        if not groups:
-            groups.append({"params": list(self.model.parameters()), "lr": lr_backbone, "weight_decay": weight_decay})
-        return groups
+        self.bce_loss = nn.BCEWithLogitsLoss()
+        self.scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
+
+    def get_lr_scale(self, epoch: int) -> float:
+        """Hệ số điều chỉnh tốc độ học theo Cosine Annealing kèm Warmup tuyến tính."""
+        if epoch < self.warmup_epochs:
+            return float(epoch + 1) / float(max(1, self.warmup_epochs))
+        progress = float(epoch - self.warmup_epochs) / float(max(1, self.epochs - self.warmup_epochs))
+        return 0.5 * (1.0 + math.cos(math.pi * progress))
 
     def train_epoch(self, epoch: int) -> dict[str, float]:
+        """Thực hiện một epoch huấn luyện."""
         self.model.train()
-        total_loss, total_ce, total_kd, total_route = 0.0, 0.0, 0.0, 0.0
-        num_batches = len(self.train_loader)
-        if num_batches == 0:
-            return {"loss": 0.0, "loss_ce": 0.0, "loss_kd": 0.0, "loss_route": 0.0}
+        scale = self.get_lr_scale(epoch)
+        for pg in self.optimizer.param_groups:
+            if "initial_lr" not in pg:
+                pg["initial_lr"] = pg["lr"]
+            pg["lr"] = pg["initial_lr"] * scale
 
-        for batch_idx, batch in enumerate(self.train_loader):
-            wave = batch["waveform"].to(self.device, non_blocking=True)
-            target = batch["target"].to(self.device, non_blocking=True)
-            snr_db = batch["snr_db"].to(self.device, non_blocking=True)
-            t0_log = batch["t0_logits"].to(self.device, non_blocking=True)
-            tema_log = batch["tema_logits"].to(self.device, non_blocking=True)
+        total_loss = 0.0
+        loss_h_sum, loss_kd_sum, loss_r_sum = 0.0, 0.0, 0.0
+        batches = 0
 
-            wave_m, target_m, snr_m, pt0_m, ptema_m = apply_mixup_with_teachers(
-                wave, target, snr_db, t0_log, tema_log,
-                alpha=self.mixup_alpha, prob=self.mixup_prob, temp=self.temp,
+        for batch in self.train_loader:
+            wave = batch["waveform"].to(self.device)
+            target = batch["target"].to(self.device)
+            snr_db = batch["snr_db"].to(self.device)
+            t0_logits = batch.get("t0_logits", torch.zeros_like(target)).to(self.device)
+            tema_logits = batch.get("tema_logits", torch.zeros_like(target)).to(self.device)
+
+            # Áp dụng Consistent Mixup
+            wave, target, snr_db, p_t0, p_tema = apply_mixup_with_teachers(
+                wave, target, snr_db, t0_logits, tema_logits,
+                alpha=self.mixup_alpha, prob=self.mixup_prob, temp=self.kd_temp
             )
 
-            # Label smoothing regularizer
-            if self.label_smoothing > 0.0:
-                target_smooth = target_m * (1.0 - self.label_smoothing) + self.label_smoothing / 36.0
-            else:
-                target_smooth = target_m
-
-            # Continuous SNR weight w_snr: low SNR -> 0 (Fold0), high SNR -> 1 (EMA)
-            w_snr = torch.sigmoid((snr_m - 15.0) / 2.5).unsqueeze(-1)
-            p_teacher_blend = (1.0 - w_snr) * pt0_m + w_snr * ptema_m
-
             self.optimizer.zero_grad()
-            with torch.autocast(self.device.type, dtype=self.amp_type, enabled=self.use_amp):
-                out = self.model(wave_m, return_dict=True)
 
-                logits_fused = out["logits"]
+            with torch.amp.autocast("cuda", enabled=self.device.type == "cuda", dtype=torch.bfloat16):
+                out = self.model(wave, return_dict=True)
+                logits = out["logits"]
                 logits_low = out["logits_low"]
                 logits_high = out["logits_high"]
                 alpha = out["alpha"]
 
-                # 1. Supervised Task Cross-Entropy
-                log_probs_fused = F.log_softmax(logits_fused, dim=-1)
-                loss_ce = -(target_smooth * log_probs_fused).sum(dim=-1).mean()
+                # 1. Hàm mất mát nhãn gốc Hard Label Loss (BCEWithLogits)
+                loss_hard = self.bce_loss(logits, target)
 
-                # 2. Dual-Teacher Blended KD (T^2 scaling)
-                log_p_fused_kd = F.log_softmax(logits_fused / self.temp, dim=-1)
-                loss_kd_fused = -(p_teacher_blend * log_p_fused_kd).sum(dim=-1).mean() * (self.temp ** 2)
+                # 2. Phân phối mềm mục tiêu kết hợp từ hai giáo viên:
+                # y_target = Sigmoid((SNR - 15) / 2.5)
+                # target_teacher = (1 - y_target) * p_t0 + y_target * p_tema
+                y_target = self.model.router.compute_target_soft_label(snr_db)
+                p_teacher_blended = (1.0 - y_target) * p_t0 + y_target * p_tema
 
-                # 3. Specialized Expert Distillation
-                log_p_low_kd = F.log_softmax(logits_low / self.temp, dim=-1)
-                log_p_high_kd = F.log_softmax(logits_high / self.temp, dim=-1)
-                loss_low_kd = -(pt0_m * log_p_low_kd).sum(dim=-1) * (self.temp ** 2)
-                loss_high_kd = -(ptema_m * log_p_high_kd).sum(dim=-1) * (self.temp ** 2)
-                loss_kd_experts = ((1.0 - w_snr.squeeze(-1)) * loss_low_kd + w_snr.squeeze(-1) * loss_high_kd).mean()
+                # Chưng cất KL Divergence cho mô hình tổng thể
+                log_p_student = F.log_softmax(logits / self.kd_temp, dim=-1)
+                loss_kd_global = F.kl_div(log_p_student, p_teacher_blended, reduction="batchmean") * (self.kd_temp ** 2)
 
-                loss_kd = 0.65 * loss_kd_fused + 0.35 * loss_kd_experts
+                # Chưng cất chuyên biệt hóa từng chuyên gia (Expert Specialization Distillation)
+                log_p_low = F.log_softmax(logits_low / self.kd_temp, dim=-1)
+                log_p_high = F.log_softmax(logits_high / self.kd_temp, dim=-1)
+                loss_kd_low = F.kl_div(log_p_low, p_t0, reduction="batchmean") * (self.kd_temp ** 2)
+                loss_kd_high = F.kl_div(log_p_high, p_tema, reduction="batchmean") * (self.kd_temp ** 2)
+                loss_kd = loss_kd_global + 0.5 * (loss_kd_low + loss_kd_high)
 
-                # 4. Router Supervision Loss
-                with torch.autocast(self.device.type, enabled=False):
-                    loss_route = F.binary_cross_entropy(alpha.float().clamp(1e-6, 1.0 - 1e-6), w_snr.float())
+                # 3. Mất mát giám sát bộ định tuyến (Router Supervision Loss)
+                loss_router = self.model.router.compute_router_loss(alpha, snr_db)
 
-                # Total Multi-Task Objective
-                loss = (1.0 - self.lambda_kd) * loss_ce + self.lambda_kd * loss_kd + self.lambda_route * loss_route.to(loss_ce.dtype)
+                # Tổng hợp hàm mất mát
+                loss = (
+                    self.lambda_hard * loss_hard
+                    + self.lambda_kd * loss_kd
+                    + self.lambda_router * loss_router
+                )
 
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-            self.optimizer.step()
-            self.scheduler.step()
+            self.scaler.scale(loss).backward()
+            self.scaler.unscale_(self.optimizer)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=5.0)
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
 
             total_loss += float(loss.item())
-            total_ce += float(loss_ce.item())
-            total_kd += float(loss_kd.item())
-            total_route += float(loss_route.item())
+            loss_h_sum += float(loss_hard.item())
+            loss_kd_sum += float(loss_kd.item())
+            loss_r_sum += float(loss_router.item())
+            batches += 1
 
+        n = max(batches, 1)
         return {
-            "loss": total_loss / num_batches,
-            "loss_ce": total_ce / num_batches,
-            "loss_kd": total_kd / num_batches,
-            "loss_route": total_route / num_batches,
+            "loss": total_loss / n,
+            "loss_hard": loss_h_sum / n,
+            "loss_kd": loss_kd_sum / n,
+            "loss_router": loss_r_sum / n,
+            "lr_backbone": self.optimizer.param_groups[0]["lr"],
+            "lr_experts": self.optimizer.param_groups[1]["lr"],
+            "lr_router": self.optimizer.param_groups[2]["lr"],
         }
 
     @torch.no_grad()
-    def evaluate(self) -> dict[str, Any]:
+    def evaluate(self) -> dict[str, dict[str, float]]:
+        """Đánh giá mô hình trên tập kiểm tra val_loader."""
         self.model.eval()
-        all_preds, all_targets, all_snrs, all_alphas = [], [], [], []
+        all_preds = []
+        all_targets = []
+        all_snrs = []
 
         for batch in self.val_loader:
-            wave = batch["waveform"].to(self.device, non_blocking=True)
-            target_idx = batch["target_idx"].numpy()
-            snr_val = batch["snr_db"].numpy()
+            wave = batch["waveform"].to(self.device)
+            target = batch["target_idx"].numpy()
+            snr = batch["snr_db"].numpy()
 
-            with torch.autocast(self.device.type, dtype=self.amp_type, enabled=self.use_amp):
-                out = self.model(wave, return_dict=True)
-                logits = out["logits"]
-                alpha = out["alpha"]
+            with torch.amp.autocast("cuda", enabled=self.device.type == "cuda", dtype=torch.bfloat16):
+                logits = self.model(wave, return_dict=False)
+                probs = F.softmax(logits.float(), dim=-1).cpu().numpy()
 
-            probs = F.softmax(logits, dim=-1).cpu().numpy()
             all_preds.append(probs)
-            all_targets.append(target_idx)
-            all_snrs.append(snr_val)
-            all_alphas.append(alpha.cpu().numpy())
-
-        if not all_preds:
-            return {}
+            all_targets.append(target)
+            all_snrs.append(snr)
 
         preds = np.concatenate(all_preds, axis=0)
         targets = np.concatenate(all_targets, axis=0)
         snrs = np.concatenate(all_snrs, axis=0)
-        alphas = np.concatenate(all_alphas, axis=0)
 
-        results = compute_snr_breakdown(preds, targets, snrs)
-        results["mean_alpha"] = float(np.mean(alphas))
-        return results
+        return compute_snr_breakdown(preds, targets, snrs)
 
-    def save_checkpoint(self, path: Path | str, is_best: bool = False) -> None:
-        path = Path(path)
-        payload = {
+    def save_checkpoint(self, path: Path, is_best: bool = False) -> None:
+        """Lưu checkpoint mô hình."""
+        ckpt = {
             "model_state_dict": self.model.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
             "best_top1_acc": self.best_top1_acc,
             "best_results": self.best_results,
         }
-        torch.save(payload, path)
+        torch.save(ckpt, path)
         if is_best:
-            torch.save(payload, self.out_dir / "best_model.pt")
+            best_path = self.out_dir / "best_model.pt"
+            torch.save(ckpt, best_path)

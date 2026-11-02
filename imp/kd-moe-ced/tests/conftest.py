@@ -1,5 +1,5 @@
 """
-Pytest fixtures and configuration for testing single-backbone CED MoE architecture.
+Cấu hình fixtures và thiết lập pytest cho kiểm thử kiến trúc Single-Backbone CED MoE.
 """
 
 import sys
@@ -14,6 +14,6 @@ if str(ROOT) not in sys.path:
 
 @pytest.fixture
 def sample_waveform():
-    """Batch of 2 synthetic audio clips at 16kHz for 4.0 seconds (64,000 samples)."""
+    """Batch gồm 2 đoạn âm thanh giả lập 16kHz trong 4.0 giây (64,000 mẫu)."""
     torch.manual_seed(42)
     return torch.randn(2, 64000)

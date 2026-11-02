@@ -1,37 +1,33 @@
 """
-Single-Backbone CED-Tiny with Split-FFN MoE and Shared Expert (CEDSingleMoESplitFFN).
+Kiến trúc Single-Backbone CED-Tiny kết hợp Split-FFN MoE và Chuyên gia Dùng chung (CEDSingleMoESplitFFN).
 
-Architecture Flow:
-    1. Waveform n_hat (16kHz, 4.0s = 64,000 samples)
-       -> RMS Energy Normalization (target_rms = 0.07925)
-    2. Parallel Frontends:
-       -> AcousticFeatureExtractor: STFT (257 bins x 401 frames) -> 6 acoustic features f_spec in R^6
-       -> LogMel Frontend: (64 Mel bins x 398 frames) -> Instance Normalization -> SpecAugment
-    3. Patch Embedding & Early Blocks:
+Luồng Kiến trúc Xuyên suốt:
+    1. Sóng âm n_hat (16kHz, 4.0 giây = 64,000 mẫu)
+       -> Chuẩn hóa Năng lượng RMS (target_rms = 0.07925)
+    2. Hai Nhánh Frontend Song Song:
+       -> AcousticFeatureExtractor: STFT (257 bins x 401 frames) -> 6 đặc trưng vật lý f_spec thuộc R^6
+       -> LogMel Frontend: (64 dải Mel x 398 frames) -> Chuẩn hóa mẫu (Instance Norm) -> SpecAugment
+    3. Tầng Nhúng Patch & Các Khối Transformer Đầu (Blocks 0..9):
        -> Conv2d(1, 192, 16x16, stride 16) -> 4x24 = 96 patch tokens
-       -> Prepend CLS token + 2D Positional Embeddings -> X_0 [B, 97, 192]
-       -> Blocks 0 to 9 (Shared Blocks): Pre-LN with 2D GREP BiasAttention
-    4. Self-Contained Spectral-Token Router:
-       -> CLS token h_9 [B, 192] from Block 9
-       -> Nén 192 -> 16 + Concat với f_spec -> R^22 -> MLP 22 -> 32 -> 2 -> Softmax -> alpha in (0, 1)
-    5. Deep MoE Blocks 10 & 11 (SplitMoEFFN):
-       -> FFN_shared (weight 0.5) + FFN_low (0.5 * (1 - alpha)) + FFN_high (0.5 * alpha)
-       -> Identity warm-start initialization (exactly equal to baseline CED-Tiny at step 0)
-    6. Dual Classifier Head:
-       -> CLS token h_final [B, 192] after Block 11 + LayerNorm
+       -> Ghép CLS token + 2D Positional Embeddings -> X_0 [B, 97, 192]
+       -> Blocks 0 đến 9 (Khối dùng chung hoàn toàn): Cấu trúc Pre-LN với 2D GREP BiasAttention
+    4. Bộ Định Tuyến Tự Thân (Self-Contained Spectral-Token Router):
+       -> Trích xuất CLS token h_9 [B, 192] từ Block 9
+       -> Nén 192 -> 16 + Ghép với f_spec [B, 6] -> R^22 -> MLP 22 -> 32 -> 2 -> Softmax -> alpha thuộc (0, 1)
+    5. Các Khối MoE Sâu (Blocks 10 & 11) dạng SplitMoEFFN:
+       -> FFN_shared (trọng số 0.5) + FFN_low (0.5 * (1 - alpha)) + FFN_high (0.5 * alpha)
+       -> Khởi tạo Warm-start bảo toàn (hoàn toàn tương đương CED-Tiny gốc tại bước 0)
+    6. Đầu Phân Loại Kép (Dual Classifier Head):
+       -> CLS token h_final [B, 192] sau Block 11 + LayerNorm
        -> Head_low: Linear(192, 36)
        -> Head_high: Linear(192, 36)
-       -> Final Logits: z = (1 - alpha) * z_low + alpha * z_high
+       -> Logits cuối cùng: z = (1 - alpha) * z_low + alpha * z_high
 
-References:
-    - V-MoE: Riquelme et al., "Scaling Vision with Sparse Mixture of Experts",
-      NeurIPS 2021. arXiv:2106.05974.
-    - Soft MoE: Puigcerver et al., "From Sparse to Soft Mixtures of Experts",
-      ICLR 2024. arXiv:2308.00951.
-    - DeepSeekMoE: Dai et al., "DeepSeekMoE: Towards Ultimate Expert Specialization
-      in Mixture-of-Experts Language Models", ACL 2024. arXiv:2401.06066.
-    - CED: Dinkel et al., "CED: Consistent Ensemble Distillation for Audio Tagging",
-      ICASSP 2024. arXiv:2308.11957.
+Tài liệu tham khảo:
+    - V-MoE: Riquelme et al., "Scaling Vision with Sparse Mixture of Experts", NeurIPS 2021. arXiv:2106.05974.
+    - Soft MoE: Puigcerver et al., "From Sparse to Soft Mixtures of Experts", ICLR 2024. arXiv:2308.00951.
+    - DeepSeekMoE: Dai et al., "DeepSeekMoE: Towards Ultimate Expert Specialization in MoE", ACL 2024. arXiv:2401.06066.
+    - CED: Dinkel et al., "CED: Consistent Ensemble Distillation for Audio Tagging", ICASSP 2024. arXiv:2308.11957.
 """
 
 from __future__ import annotations
@@ -51,20 +47,20 @@ from src.router import SelfContainedSpectralTokenRouter
 
 class SplitMoEFFN(nn.Module):
     """
-    Split-FFN with 1 Shared Expert + 2 Routed Experts (Low-SNR & High-SNR).
+    Cấu trúc Split-FFN gồm 1 Chuyên gia Dùng chung (Shared Expert) + 2 Chuyên gia Định tuyến (Low-SNR & High-SNR).
 
-    Mathematical Formulation:
+    Công thức Toán học:
         y = 0.5 * FFN_shared(x) + 0.5 * [(1 - alpha) * FFN_low(x) + alpha * FFN_high(x)]
 
-    Total routing weight:
-        0.5 + 0.5 * (1 - alpha + alpha) = 1.0 (Strictly normalized convex combination)
+    Tổng trọng số điều phối:
+        0.5 + 0.5 * (1 - alpha + alpha) = 1.0 (Tổ hợp lồi chuẩn hóa tuyệt đối).
 
-    Identity Warm-Start Initialization:
-        When ffn_shared, ffn_low, and ffn_high are initialized with exact copies of base_mlp,
-        at step 0:
+    Khởi tạo Identity Warm-Start:
+        Khi ffn_shared, ffn_low, và ffn_high được sao chép nguyên bản từ base_mlp tiền huấn luyện,
+        tại step 0:
             y = 0.5 * M(x) + 0.5 * [(1 - alpha) * M(x) + alpha * M(x)]
               = 0.5 * M(x) + 0.5 * M(x) = M(x)
-        The output is MATHEMATICALLY IDENTICAL to the baseline CED-Tiny MLP for ANY alpha in (0, 1).
+        Đầu ra HOÀN TOÀN ĐỒNG NHẤT VỀ MẶT TOÁN HỌC với CED-Tiny chuẩn cho MỌI giá trị alpha thuộc (0, 1).
     """
     def __init__(self, base_mlp: nn.Module) -> None:
         super().__init__()
@@ -74,10 +70,10 @@ class SplitMoEFFN(nn.Module):
 
     def forward(self, x: Tensor, alpha: Tensor) -> Tensor:
         """
-        Args:
-            x: [B, Tokens, C] (e.g. [B, 97, 192])
-            alpha: [B, 1] or [B, 1, 1] soft routing weight
-        Returns:
+        Tham số:
+            x: [B, Tokens, C] (ví dụ: [B, 97, 192])
+            alpha: [B, 1] hoặc [B, 1, 1] trọng số điều phối mềm
+        Trả về:
             out: [B, Tokens, C]
         """
         if alpha.ndim == 2:
@@ -87,20 +83,20 @@ class SplitMoEFFN(nn.Module):
         out_low = self.ffn_low(x)
         out_high = self.ffn_high(x)
 
-        # Normalized convex combination
+        # Tổ hợp lồi chuẩn hóa
         routed_out = (1.0 - alpha) * out_low + alpha * out_high
         return 0.5 * out_shared + 0.5 * routed_out
 
 
 class CEDSingleMoESplitFFN(nn.Module):
     """
-    Complete Single-Backbone CED-Tiny MoE Architecture (~6.62M parameters).
+    Kiến trúc toàn vẹn Single-Backbone CED-Tiny MoE (~6.62M tham số).
 
-    - Blocks 0 to 9: 100% shared standard Transformer blocks with 2D GREP BiasAttention.
-    - Blocks 10 & 11: Split-FFN containing 1 Shared Expert + 2 Routed Experts (Low & High).
-    - Classifier: Dual-Head (Head_low and Head_high) blended via alpha.
-    - Self-Contained Spectral-Token Router: Uses physical features from AcousticFeatureExtractor
-      and intermediate CLS token representation from Block 9.
+    - Blocks 0 đến 9: Các khối Transformer dùng chung 100% với cơ chế 2D GREP BiasAttention.
+    - Blocks 10 & 11: Khối Split-FFN chứa 1 Chuyên gia dùng chung + 2 Chuyên gia chuyên biệt (Low & High).
+    - Bộ phân loại: Dual-Head (Head_low và Head_high) hòa trộn mềm qua trọng số alpha.
+    - Bộ định tuyến Tự thân (Self-Contained Router): Sử dụng 6 đặc trưng vật lý từ AcousticFeatureExtractor
+      kết hợp với biểu diễn trung gian của CLS token từ Block 9.
     """
     def __init__(
         self,
@@ -115,12 +111,12 @@ class CEDSingleMoESplitFFN(nn.Module):
         self.split_blocks = split_blocks
         self.num_classes = num_classes
 
-        # 1. Frontend Audio Processors
+        # 1. Các bộ xử lý âm thanh Frontend
         self.frontend = LogMel(n_mels=freq_bins, num_frames=frames)
         self.spec_augment = SpecAugment()
         self.acoustic_extractor = AcousticFeatureExtractor()
 
-        # 2. Backbone Base Model (Pre-LN ViT with 2D GREP)
+        # 2. Backbone cơ sở (Pre-LN ViT với 2D GREP)
         self.vit_base = ViTSBias(
             num_classes=num_classes,
             freq_bins=freq_bins,
@@ -133,7 +129,7 @@ class CEDSingleMoESplitFFN(nn.Module):
         if load_pretrained:
             load_ced_tiny(self.vit_base)
 
-        # 3. Self-Contained Spectral-Token Router
+        # 3. Bộ định tuyến Tự thân (Spectral-Token Router)
         self.router = SelfContainedSpectralTokenRouter(
             spectral_dim=6,
             token_dim=192,
@@ -141,7 +137,7 @@ class CEDSingleMoESplitFFN(nn.Module):
             hidden_dim=32,
         )
 
-        # 4. Replace MLPs in deep blocks (10 & 11) with SplitMoEFFN
+        # 4. Thay thế tầng MLP trong các khối sâu (10 & 11) bằng SplitMoEFFN
         self.moe_blocks: dict[int, SplitMoEFFN] = {}
         for block_idx in self.split_blocks:
             original_mlp = self.vit_base.vit.blocks[block_idx].mlp
@@ -149,7 +145,7 @@ class CEDSingleMoESplitFFN(nn.Module):
             self.vit_base.vit.blocks[block_idx].mlp = moe_mlp
             self.moe_blocks[block_idx] = moe_mlp
 
-        # 5. Dual Classifier Heads (initialized from pretrained base head)
+        # 5. Đầu phân loại kép Dual-Head (khởi tạo từ head gốc tiền huấn luyện)
         original_head = self.vit_base.vit.head
         self.head_low = copy.deepcopy(original_head)
         self.head_high = copy.deepcopy(original_head)
@@ -160,21 +156,21 @@ class CEDSingleMoESplitFFN(nn.Module):
         return_dict: bool = False,
     ) -> dict[str, Tensor] | Tensor:
         """
-        End-to-End Forward Pass:
-            Waveform -> Features & Mel -> Blocks 0..9 -> Router alpha -> Blocks 10..11 -> Dual Head
+        Lượt truyền thẳng End-to-End:
+            Sóng âm -> Đặc trưng vật lý & Phổ Mel -> Blocks 0..9 -> Router alpha -> Blocks 10..11 -> Đầu phân loại kép
         """
-        # Step 1: RMS Energy Normalization (target_rms = 0.07925)
+        # Bước 1: Chuẩn hóa năng lượng RMS (target_rms = 0.07925)
         wave_norm = rms_normalize(waveform)
 
-        # Step 2: Extract 6 physical/spectral features from normalized waveform
+        # Bước 2: Trích xuất 6 đặc trưng vật lý âm học từ sóng âm đã chuẩn hóa
         spectral_feat = self.acoustic_extractor(wave_norm)  # [B, 6]
 
-        # Step 3: Compute Log-Mel Spectrogram & SpecAugment
+        # Bước 3: Tính toán phổ Log-Mel và áp dụng SpecAugment
         with torch.autocast(waveform.device.type, enabled=False):
             mel = self.frontend(wave_norm.float())  # [B, 1, 64, 398]
         mel_aug = self.spec_augment(mel)
 
-        # Step 4: Patch Embedding & Pre-LN Initialization
+        # Bước 4: Chiếu Patch Embedding và chuẩn hóa trước (Pre-LN)
         vit = self.vit_base.vit
         # Conv2d 16x16, stride 16 -> 4 x 24 = 96 patch tokens
         x = vit.patch_embed(mel_aug[..., : self.vit_base.frames])
@@ -185,35 +181,35 @@ class CEDSingleMoESplitFFN(nn.Module):
 
         self.vit_base.shared.value = None
 
-        # Step 5: Execute Shared Blocks 0 through 9
+        # Bước 5: Truyền qua các khối dùng chung từ Block 0 đến Block 9
         for i in range(10):
             x = vit.blocks[i](x)
 
-        # Extract Block 9 CLS token representation for router
+        # Trích xuất biểu diễn token CLS tại Block 9 cho bộ định tuyến
         block9_token = x[:, 0]  # [B, 192]
 
-        # Step 6: Self-Contained Router predicts dynamic soft weight alpha in (0, 1)
+        # Bước 6: Bộ định tuyến dự đoán trọng số mềm alpha thuộc khoảng (0, 1)
         alpha, gates = self.router(spectral_feat, block9_token)
 
-        # Step 7: Execute Deep MoE Blocks 10 & 11
+        # Bước 7: Truyền qua các khối MoE sâu (Blocks 10 & 11)
         for i in self.split_blocks:
             block = vit.blocks[i]
-            # Attention with 2D GREP
+            # Attention với cơ chế 2D GREP
             x = x + block.drop_path1(block.ls1(block.attn(block.norm1(x))))
-            # MoE Split-FFN modulated by alpha
+            # Tầng SplitMoEFFN điều chế theo alpha
             moe_mlp = block.mlp
             normed_x = block.norm2(x)
             mlp_out = moe_mlp(normed_x, alpha)
             x = x + block.drop_path2(block.ls2(mlp_out))
 
-        # Step 8: Final LayerNorm and Dual Head Aggregation
+        # Bước 8: Chuẩn hóa LayerNorm cuối và tổng hợp từ Dual Heads
         x = vit.norm(x)
         cls_final = x[:, 0]  # [B, 192]
 
         logits_low = self.head_low(cls_final)   # [B, 36]
         logits_high = self.head_high(cls_final) # [B, 36]
 
-        # Continuous soft fusion: z = (1 - alpha) * z_low + alpha * z_high
+        # Kết hợp mềm liên tục: z = (1 - alpha) * z_low + alpha * z_high
         logits_fused = (1.0 - alpha) * logits_low + alpha * logits_high
 
         if return_dict:
@@ -229,6 +225,7 @@ class CEDSingleMoESplitFFN(nn.Module):
         return logits_fused
 
     def get_num_params(self) -> dict[str, int]:
+        """Thống kê tổng số lượng tham số của mô hình."""
         total = sum(p.numel() for p in self.parameters())
         trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
         router = sum(p.numel() for p in self.router.parameters())

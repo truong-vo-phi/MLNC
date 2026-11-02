@@ -14,7 +14,10 @@ if "torchaudio._extension" not in sys.modules:
     mock_ext._check_cuda_version = lambda *args, **kwargs: None
     sys.modules["torchaudio._extension"] = mock_ext
 
-import torchaudio.compliance.kaldi as ta_kaldi
+try:
+    import torchaudio.compliance.kaldi as ta_kaldi
+except ImportError:
+    ta_kaldi = None
 
 
 class Fbank(nn.Module):

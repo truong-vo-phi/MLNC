@@ -1,8 +1,12 @@
 """
-Training script for CEDSingleMoESplitFFN with Dual-Teacher Knowledge Distillation.
+Script huấn luyện cho CEDSingleMoESplitFFN với Chưng cất Tri thức Kép (Dual-Teacher Knowledge Distillation).
 
-Usage:
+Cách dùng lệnh (CLI Commands):
+    # Huấn luyện mặc định 15 epoch với batch size 64
     python train_kd_moe.py --epochs 15 --batch-size 64
+
+    # Huấn luyện tùy chỉnh tốc độ học và đường dẫn dữ liệu
+    python train_kd_moe.py --epochs 20 --batch-size 32 --lr-backbone 3e-5 --lr-experts 1e-4 --lr-router 2e-4
 """
 
 from __future__ import annotations
@@ -17,19 +21,21 @@ from src.models.split_moe import CEDSingleMoESplitFFN
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train CEDSingleMoESplitFFN with Dual-Teacher KD")
-    parser.add_argument("--epochs", type=int, default=15)
-    parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--lr-backbone", type=float, default=4.0e-5)
-    parser.add_argument("--lr-experts", type=float, default=1.2e-4)
-    parser.add_argument("--lr-router", type=float, default=2.0e-4)
-    parser.add_argument("--data-root", type=Path, default=Path("/marimo/datasets/mix-dataset-v2"))
-    parser.add_argument("--cache-dir", type=Path, default=Path("/marimo/datasets"))
-    parser.add_argument("--out-dir", type=Path, default=Path(__file__).resolve().parent / "checkpoints")
+    parser = argparse.ArgumentParser(
+        description="Huấn luyện mô hình CEDSingleMoESplitFFN với phương pháp chưng cất tri thức kép (Dual-Teacher KD)"
+    )
+    parser.add_argument("--epochs", type=int, default=15, help="Tổng số epoch huấn luyện (mặc định: 15)")
+    parser.add_argument("--batch-size", type=int, default=64, help="Kích thước batch huấn luyện (mặc định: 64)")
+    parser.add_argument("--lr-backbone", type=float, default=4.0e-5, help="Tốc độ học cho backbone sớm Blocks 0-9 (mặc định: 4e-5)")
+    parser.add_argument("--lr-experts", type=float, default=1.2e-4, help="Tốc độ học cho các chuyên gia MoE Blocks 10-11 (mặc định: 1.2e-4)")
+    parser.add_argument("--lr-router", type=float, default=2.0e-4, help="Tốc độ học cho bộ định tuyến Router (mặc định: 2e-4)")
+    parser.add_argument("--data-root", type=Path, default=Path("/marimo/datasets/mix-dataset-v2"), help="Thư mục gốc chứa tập dữ liệu Mixture-36")
+    parser.add_argument("--cache-dir", type=Path, default=Path("/marimo/datasets"), help="Thư mục chứa cache file npy và logits giáo viên")
+    parser.add_argument("--out-dir", type=Path, default=Path(__file__).resolve().parent / "checkpoints", help="Thư mục lưu checkpoint mô hình")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"=== Starting Training CEDSingleMoESplitFFN on {device} ===")
+    print(f"=== Bắt đầu Huấn luyện CEDSingleMoESplitFFN trên thiết bị: {device} ===")
 
     train_base = Mixture36Dataset(root=args.data_root, split="train")
     val_base = Mixture36Dataset(root=args.data_root, split="eval")
@@ -39,8 +45,8 @@ def main() -> None:
     val_npy = args.cache_dir / "validation.npy"
 
     if not train_npy.is_file():
-        print(f"Notice: Dataset cache {train_npy} not found on local machine.")
-        print("Model is configured and ready for execution in GPU environment.")
+        print(f"Thông báo: Không tìm thấy file cache dữ liệu tại {train_npy} trên máy cục bộ.")
+        print("Mô hình đã được cấu hình hoàn chỉnh và sẵn sàng chạy trên môi trường máy chủ GPU.")
         return
 
     train_dataset = KDNoiseCacheDataset(
