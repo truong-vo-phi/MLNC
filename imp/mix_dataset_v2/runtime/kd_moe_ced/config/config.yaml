@@ -1,0 +1,99 @@
+# ==============================================================================
+# Configuration: Single-Backbone Mixture-of-Experts (MoE) v2 for Noise-Robust Audio Classification
+#
+# References:
+#   - V-MoE: Riquelme et al., "Scaling Vision with Sparse Mixture of Experts", NeurIPS 2021. arXiv:2106.05974
+#   - Soft MoE: Puigcerver et al., "From Sparse to Soft Mixtures of Experts", ICLR 2024. arXiv:2308.00951
+#   - DeepSeekMoE: Dai et al., "DeepSeekMoE: Towards Ultimate Expert Specialization in MoE", ACL 2024. arXiv:2401.06066
+#   - HydraLoRA: Tian et al., "HydraLoRA: An Asymmetric LoRA Architecture for Efficient Fine-Tuning", NeurIPS 2024 Oral. arXiv:2404.19245
+#   - CED: Dinkel et al., "CED: Consistent Ensemble Distillation for Audio Tagging", ICASSP 2024. arXiv:2308.11957
+#   - BEATs: Chen et al., "BEATs: Audio Pre-Training with Acoustic Tokenizers", ICML 2023. arXiv:2212.09058
+#   - DeiT: Touvron et al., "Training data-efficient image transformers & distillation through attention", ICML 2021. arXiv:2012.12877
+# ==============================================================================
+
+experiment:
+  name: "single_backbone_moe_v2"
+  seed: 42
+  num_classes: 36
+  sample_rate: 16000
+  duration: 4.0
+  snr_levels: [-5.0, 0.0, 5.0, 10.0, 15.0, 20.0]
+
+dataset:
+  data_root: "/marimo/datasets/mix-dataset-v2"
+  cache_dir: "/marimo/datasets"
+  train_npy: "/marimo/datasets/train.npy"
+  val_npy: "/marimo/datasets/validation.npy"
+  num_workers: 4
+  pin_memory: true
+
+frontend:
+  sample_rate: 16000
+  n_fft: 512
+  win_length: 400
+  hop_length: 160
+  n_mels: 64
+  f_min: 20.0
+  f_max: 8000.0
+  num_frames: 398
+  log_eps: 1.0e-6
+  norm_eps: 1.0e-5
+  target_rms: 0.07925
+
+specaugment:
+  freq_masks: 2
+  freq_width: 8
+  time_masks: 2
+  time_width: 24
+
+ced_tiny:
+  arch: "deit_tiny_patch16_224"
+  embed_dim: 192
+  depth: 12
+  num_heads: 3
+  mlp_ratio: 4.0
+  dropout: 0.0
+  attn_dropout: 0.0
+  drop_path: 0.0
+  bias_init: "zero"
+  use_bias: true
+  time_major: false
+  hybrid_pool: false
+  ced_repo: "mispeech/ced-tiny"
+
+moe_split:
+  split_blocks: [10, 11]
+  num_routed_experts: 2
+  use_shared_expert: true
+  shared_expert_ratio: 1.0
+  router_hidden_dim: 64
+  temperature: 1.0
+
+moe_hydra:
+  target_blocks: [6, 7, 8, 9, 10, 11]
+  lora_rank: 16
+  lora_alpha: 16.0
+  num_routed_experts: 2
+  router_hidden_dim: 64
+
+router:
+  feature_dim: 6
+  hidden_dim: 32
+  transition_center_db: 15.0
+  transition_tau: 2.5
+  lambda_route_loss: 0.20
+
+training:
+  batch_size: 128
+  epochs: 15
+  lr_backbone: 5.0e-5
+  lr_experts: 1.5e-4
+  lr_router: 2.0e-4
+  weight_decay: 0.05
+  warmup_epochs: 2
+  min_lr: 1.0e-6
+  mixup_alpha: 0.4
+  mixup_prob: 0.8
+  label_smoothing: 0.1
+  amp_dtype: "bfloat16"
+  grad_clip_norm: 1.0

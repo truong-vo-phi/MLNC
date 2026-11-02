@@ -1,0 +1,22 @@
+# Generated inputs, weights and experiment outputs are never part of this package.
+benchmark_results/
+datasets/
+checkpoints/
+*.npy
+*.npz
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.wav
+*.flac
+*.mp3
+*.zip
+*.partial
+*.range-partial
+*.range-progress.json
+*.log
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/

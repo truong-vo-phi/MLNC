@@ -1,0 +1,433 @@
+{
+  "team_source_commit": "697064dfd638f0b934f1a9ee84cac2cf0f32c063",
+  "files": [
+    {
+      "source": "train_ce9_clean.py",
+      "published": "train_ce9_clean.py",
+      "original_sha256": "990690617afa512b67bbe11c3a6213f867a96353d5441b7cdac3c961680325e5",
+      "published_sha256": "990690617afa512b67bbe11c3a6213f867a96353d5441b7cdac3c961680325e5",
+      "portability_edit": false
+    },
+    {
+      "source": "prepare_ce9.py",
+      "published": "prepare_ce9.py",
+      "original_sha256": "271b6e0225b8a8b65bab8052a59784ed53ce38c18232a54a9f2d9c394b844070",
+      "published_sha256": "8bd1f93f2c5e63e56ecf236df948deeb78d5f4920736764f8f60c23558d160ca",
+      "portability_edit": true
+    },
+    {
+      "source": "train_team_kd_moe_full.py",
+      "published": "train_team_kd_moe_full.py",
+      "original_sha256": "fe8999742d8f754d6c96c03c7c8daeaa941e1b148d42b0ed4cc6bd24ecd468ba",
+      "published_sha256": "924b043ac9174b877072e913487ee46d0450ea48d9bf96bd7331e7fd29c1a7e8",
+      "portability_edit": true
+    },
+    {
+      "source": "download_team_mix_v2.py",
+      "published": "download_team_mix_v2.py",
+      "original_sha256": "1c40dc9b8fec767e0812ec4c3ce01ba4e329f65f45995becbec3480156b364ae",
+      "published_sha256": "054da8f612870dc78e92828c9be1734e6e35eca617466302d703ba42179983bd",
+      "portability_edit": true
+    },
+    {
+      "source": "verify_team_frcrn_cache.py",
+      "published": "verify_team_frcrn_cache.py",
+      "original_sha256": "d4c3c1bd5f66ee2232a2f506f282b368bcc437fdd833e6b052fefff38df41dab",
+      "published_sha256": "c499206125c50277e1b99169e3ab7f03536d696da665f309885be0bc879f512a",
+      "portability_edit": true
+    },
+    {
+      "source": "noise_pipeline/ce9_models.py",
+      "published": "noise_pipeline/ce9_models.py",
+      "original_sha256": "4cab79fbf73291df96f86e13880ec077cac69ab44368390059928be87a2f588c",
+      "published_sha256": "29693212263c88cffc2e560d8cba707156e360b3110d36131997ccc97aa38810",
+      "portability_edit": true
+    },
+    {
+      "source": "third_party/ced_ce9/models/audiotransformer.py",
+      "published": "third_party/ced_ce9/models/audiotransformer.py",
+      "original_sha256": "30cd2a45c134165face2980dde188cea1ce44cb5eff44864d162ecd1e04c4409",
+      "published_sha256": "185a3647cdecf183291d388e9168a8cd9573cdd79d3b4488057c11fc6341c5b7",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/ced_ce9/models/checkpoints.py",
+      "published": "third_party/ced_ce9/models/checkpoints.py",
+      "original_sha256": "384345d05805ca6d0f7512576775e8805d3b1c4992803b0818db8166cc443594",
+      "published_sha256": "480ea6d06a378e196d9adf5be43a04fcc93209c61c3b6999967cd6f7deba5346",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/ced_ce9/models/ensemble.py",
+      "published": "third_party/ced_ce9/models/ensemble.py",
+      "original_sha256": "83bbbfc8f3495d1ebc0df376a24e3eacdab04fcb8c79394f27e4bdde9bca431f",
+      "published_sha256": "f0258693f65dea18b3feb59a15d91b7e26df36f1f6c1a9c352007e636d1af6ef",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/ced_ce9/models/layers.py",
+      "published": "third_party/ced_ce9/models/layers.py",
+      "original_sha256": "67753e9aa840221bef76057f2c07cdc354791a2bd95c0f3562cd4e6e129bbae9",
+      "published_sha256": "c61d6bbcb5ecd2915376b5119141d556235f0f87b5b9b19c1c3bac6417fb2d19",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/ced_ce9/models/__init__.py",
+      "published": "third_party/ced_ce9/models/__init__.py",
+      "original_sha256": "c27c78ff3d00dc55945500977043e122f2e92f969765f47fd117f643e50ec72b",
+      "published_sha256": "45a01fd03e9837c3835026f8e09c51cb3f857c7f21aa1440f13e9e488e574294",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/ced_ce9/LICENSE",
+      "published": "third_party/ced_ce9/LICENSE",
+      "original_sha256": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
+      "published_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/efficientat_ce9/models/mn/attention_pooling.py",
+      "published": "third_party/efficientat_ce9/models/mn/attention_pooling.py",
+      "original_sha256": "05cef761bad626b75651288ed2ec0141715a209e2999ef8c80ca2031869d7af1",
+      "published_sha256": "52b6903d5d62b3639ec609166cd08c36342588bd7988fe41ac72f3cfc496ce4f",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/efficientat_ce9/models/mn/block_types.py",
+      "published": "third_party/efficientat_ce9/models/mn/block_types.py",
+      "original_sha256": "03bbb3c9a03b8b2517b5197021c478c552a04652743b4e820ff7680da0ec39ab",
+      "published_sha256": "e13ae49b6885217d6936d9203567aad1b6cb2f1229979d6d1ae77b836f3d1344",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/efficientat_ce9/models/mn/model.py",
+      "published": "third_party/efficientat_ce9/models/mn/model.py",
+      "original_sha256": "54c1b94233415ec8413d3740855c1f6c0283496ae9db2a7b37e57fcd6cf4f43a",
+      "published_sha256": "471b2c482248d782b93881c5e834c0edc23c1e7e6f42a437e4c096b9d8ed4c3e",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/efficientat_ce9/models/mn/utils.py",
+      "published": "third_party/efficientat_ce9/models/mn/utils.py",
+      "original_sha256": "45bdf15573c5b67a20b347cd59a27ad82d6c87415368bdff9dc22fb0422159d4",
+      "published_sha256": "deb551bd854f90ca1473d731de1d7586af9449fc95fd2432f4cc9d0ccd38c11b",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/efficientat_ce9/models/preprocess.py",
+      "published": "third_party/efficientat_ce9/models/preprocess.py",
+      "original_sha256": "ae060c5b9e6ec26513f6b56d1ba5e0f8347cc5c872c47faa6f720332a007f23e",
+      "published_sha256": "f4d5942eab7b916cb67fdda0f7ddfee152a31fa9a90f0f23ad21019d7a1081cf",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/efficientat_ce9/helpers/utils.py",
+      "published": "third_party/efficientat_ce9/helpers/utils.py",
+      "original_sha256": "53bec424293ed9f5bc7917ae24fc3db1dc666b4d02949d323e3a640331a1052b",
+      "published_sha256": "5d1e0e9198d098b92837fea0d002f116e2d0e2df9d9ee16775e519c45c171011",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/efficientat_ce9/metadata/class_labels_indices.csv",
+      "published": "third_party/efficientat_ce9/metadata/class_labels_indices.csv",
+      "original_sha256": "a9c221f673b0c20bd8674c4594a77aea33fca3702a120182d2737b50d099a452",
+      "published_sha256": "cdd1049833c4b86127c2773ac0d14a2754b6a6d0d1798002ed5c66e699708429",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/efficientat_ce9/LICENSE",
+      "published": "third_party/efficientat_ce9/LICENSE",
+      "original_sha256": "7fecf57238d733faf76a0d178f4973e9d3423e49e400d312a43e647700ce41ff",
+      "published_sha256": "7a45b1641304427db80df436cab61c04ddb634d97e9a8b7a93de41db940fa8b5",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/panns_ce9/pytorch/models.py",
+      "published": "third_party/panns_ce9/pytorch/models.py",
+      "original_sha256": "d6e99a71cf3ede3ea816e040bc20e3dfb3fc689559f5337b369645175ebdf0f0",
+      "published_sha256": "7f9af440395ace5160bbb51d654a0dc35fb887fbf5edecb12da61ff6efb306d9",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/panns_ce9/pytorch/pytorch_utils.py",
+      "published": "third_party/panns_ce9/pytorch/pytorch_utils.py",
+      "original_sha256": "f1cd8e03f40193ccf8100fc3c7a2bb7904a7a4c17bd44a89d0db57d3c133d7c6",
+      "published_sha256": "1464fcfbfc0fe4c55f690f6b39e1c80eeed5de1e7fd1b7fd30334d304de7dbe9",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/panns_ce9/LICENSE.MIT",
+      "published": "third_party/panns_ce9/LICENSE.MIT",
+      "original_sha256": "5f8aeb556222b903f917a26307f54fcb9a2be6454c904b80b53e905c6063b4ce",
+      "published_sha256": "7e540655d851d9737fafaa9f0cbd064c3a29bdfe5e937ee07a09360f85161975",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/beats/BEATs.py",
+      "published": "third_party/beats/BEATs.py",
+      "original_sha256": "27f289db7c56ce26f2ceb50d3719854b91b2dec1c2830d8b1dd8de1bbee19eeb",
+      "published_sha256": "27f289db7c56ce26f2ceb50d3719854b91b2dec1c2830d8b1dd8de1bbee19eeb",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/beats/backbone.py",
+      "published": "third_party/beats/backbone.py",
+      "original_sha256": "31c0378379a7e0f1d1069f9da444fb86890fe1ea078959a2dcd39640cdcadbaa",
+      "published_sha256": "31c0378379a7e0f1d1069f9da444fb86890fe1ea078959a2dcd39640cdcadbaa",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/beats/modules.py",
+      "published": "third_party/beats/modules.py",
+      "original_sha256": "edeb6b6cd6a784da749f932c3e0783c0bce556fc768d0d23a4d53d4b819eb424",
+      "published_sha256": "edeb6b6cd6a784da749f932c3e0783c0bce556fc768d0d23a4d53d4b819eb424",
+      "portability_edit": false
+    },
+    {
+      "source": "third_party/beats/LICENSE",
+      "published": "third_party/beats/LICENSE",
+      "original_sha256": "b5cb7ff7859e7d282d98fc43ab081b0dda5dc659dc3385cf65740c759a7e6a6c",
+      "published_sha256": "b5cb7ff7859e7d282d98fc43ab081b0dda5dc659dc3385cf65740c759a7e6a6c",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/dataset.py",
+      "published": "runtime/kd_moe_ced/src/dataset.py",
+      "original_sha256": "1565dc8bfc6c57517cc6f60bc6f6da69aa187c356980007317f3777a71b1a64a",
+      "published_sha256": "1565dc8bfc6c57517cc6f60bc6f6da69aa187c356980007317f3777a71b1a64a",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/frontend.py",
+      "published": "runtime/kd_moe_ced/src/frontend.py",
+      "original_sha256": "95f7a5c1d2b579767876e6372d70f4b57e4e843ad0c25382876c9eb68d46b816",
+      "published_sha256": "95f7a5c1d2b579767876e6372d70f4b57e4e843ad0c25382876c9eb68d46b816",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/kd_trainer.py",
+      "published": "runtime/kd_moe_ced/src/kd_trainer.py",
+      "original_sha256": "2450c29901a04d40726ebd2b11c905c7d7e57f23cca984991926b2bc524f3726",
+      "published_sha256": "98e26d98cee0f1b3c78ceeec00154d31716806036ec48254032c4ac11b1e525e",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/metrics.py",
+      "published": "runtime/kd_moe_ced/src/metrics.py",
+      "original_sha256": "f1114b3111b9743b7e62aa9b8ab6201d55e67b349dad4811a2546067e10c2b7c",
+      "published_sha256": "f1114b3111b9743b7e62aa9b8ab6201d55e67b349dad4811a2546067e10c2b7c",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/pipeline.py",
+      "published": "runtime/kd_moe_ced/src/pipeline.py",
+      "original_sha256": "7004933f7ffe0603bb9f1e8795855a94c5262d333b2d8b029233f14ee10c4273",
+      "published_sha256": "c9e551f242b67dcb46fb0386c53d9c45acbd1dee9bb0e893f804d580da289608",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/router.py",
+      "published": "runtime/kd_moe_ced/src/router.py",
+      "original_sha256": "6917c01d4d210c0e61a3bcdf555059557d4e5efa5b670660db7fb3a7203f2565",
+      "published_sha256": "6917c01d4d210c0e61a3bcdf555059557d4e5efa5b670660db7fb3a7203f2565",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/__init__.py",
+      "published": "runtime/kd_moe_ced/src/__init__.py",
+      "original_sha256": "2b22bab41b62b62cf66ba8bad72a8a1e306fb7130de451d578e22a308163b3a9",
+      "published_sha256": "2b22bab41b62b62cf66ba8bad72a8a1e306fb7130de451d578e22a308163b3a9",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/split_moe.py",
+      "published": "runtime/kd_moe_ced/src/models/split_moe.py",
+      "original_sha256": "8ca0e8d4008777a8b28a0d50877af421fbe16e04d39a77ce485596384a5d3f58",
+      "published_sha256": "8ca0e8d4008777a8b28a0d50877af421fbe16e04d39a77ce485596384a5d3f58",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/vit_grep.py",
+      "published": "runtime/kd_moe_ced/src/models/vit_grep.py",
+      "original_sha256": "a340ee256b4d21424f7a8010f0c53efd5a317c5241162521cc9b7c6b7ad86753",
+      "published_sha256": "a340ee256b4d21424f7a8010f0c53efd5a317c5241162521cc9b7c6b7ad86753",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/__init__.py",
+      "published": "runtime/kd_moe_ced/src/models/__init__.py",
+      "original_sha256": "c3bfe7dcf8cc405a78f56e62cf9b8c4d902123e479fc4a446fd52e0933a95895",
+      "published_sha256": "c3bfe7dcf8cc405a78f56e62cf9b8c4d902123e479fc4a446fd52e0933a95895",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/beat/attention.py",
+      "published": "runtime/kd_moe_ced/src/models/beat/attention.py",
+      "original_sha256": "7642eb5af7b8dde6a56c8c73849bceddeff8f451e1b4d36a2d77a5cd67fcc225",
+      "published_sha256": "7642eb5af7b8dde6a56c8c73849bceddeff8f451e1b4d36a2d77a5cd67fcc225",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/beat/backbone.py",
+      "published": "runtime/kd_moe_ced/src/models/beat/backbone.py",
+      "original_sha256": "c59d23085b443a650b11aff760d0bfa9acea47532bb8287dd062dadd27ec6a5e",
+      "published_sha256": "c59d23085b443a650b11aff760d0bfa9acea47532bb8287dd062dadd27ec6a5e",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/beat/base.py",
+      "published": "runtime/kd_moe_ced/src/models/beat/base.py",
+      "original_sha256": "13dfcc8b55551ba8ca64b402b2aaf50151fe3def9d7cd8323af291ff681c4a9b",
+      "published_sha256": "13dfcc8b55551ba8ca64b402b2aaf50151fe3def9d7cd8323af291ff681c4a9b",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/beat/beat.py",
+      "published": "runtime/kd_moe_ced/src/models/beat/beat.py",
+      "original_sha256": "c9572539c7b0ba5ecc44009669d2cfde6ca90259a6a29e1c9ed5dd951b52f7c9",
+      "published_sha256": "c9572539c7b0ba5ecc44009669d2cfde6ca90259a6a29e1c9ed5dd951b52f7c9",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/beat/checkpoint.py",
+      "published": "runtime/kd_moe_ced/src/models/beat/checkpoint.py",
+      "original_sha256": "085bc00c8eb35f3e5904bd8abda645b2dfc77554a3bdb9c2b6ccae537294e6eb",
+      "published_sha256": "085bc00c8eb35f3e5904bd8abda645b2dfc77554a3bdb9c2b6ccae537294e6eb",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/beat/classifier.py",
+      "published": "runtime/kd_moe_ced/src/models/beat/classifier.py",
+      "original_sha256": "b8e03f3bfcdfe755ce5c4758fc619741b99191c7ac472ad37b2dda2c57bdbbee",
+      "published_sha256": "b8e03f3bfcdfe755ce5c4758fc619741b99191c7ac472ad37b2dda2c57bdbbee",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/beat/encoder.py",
+      "published": "runtime/kd_moe_ced/src/models/beat/encoder.py",
+      "original_sha256": "d975a86939f92a44f8a18037ac2afa642ec50b0c778ae4f6f3c8622e5a0e9416",
+      "published_sha256": "d975a86939f92a44f8a18037ac2afa642ec50b0c778ae4f6f3c8622e5a0e9416",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/beat/ffn.py",
+      "published": "runtime/kd_moe_ced/src/models/beat/ffn.py",
+      "original_sha256": "cc58771f2175a45c3ea1b6d70c0bda513ce78f3482c25dba363298ebf9e4eb04",
+      "published_sha256": "cc58771f2175a45c3ea1b6d70c0bda513ce78f3482c25dba363298ebf9e4eb04",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/beat/frontend.py",
+      "published": "runtime/kd_moe_ced/src/models/beat/frontend.py",
+      "original_sha256": "56c75c8454f1743e8587960eb4312ed1e0884cb804b52a0272196285dd0aa626",
+      "published_sha256": "995b83381d98715316dbb20beb5b5c8804054a3e1de1370c22bf147e56c1b27d",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/beat/patch_embed.py",
+      "published": "runtime/kd_moe_ced/src/models/beat/patch_embed.py",
+      "original_sha256": "eb1c9d605191a087713cada786fd5e800d8b42c574179733075052eba6caa2ed",
+      "published_sha256": "eb1c9d605191a087713cada786fd5e800d8b42c574179733075052eba6caa2ed",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/src/models/beat/__init__.py",
+      "published": "runtime/kd_moe_ced/src/models/beat/__init__.py",
+      "original_sha256": "3c8cd47fa34c815ccf863290602c9246ac09135cffb3666b7e73a3863e691256",
+      "published_sha256": "3c8cd47fa34c815ccf863290602c9246ac09135cffb3666b7e73a3863e691256",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/tests/conftest.py",
+      "published": "runtime/kd_moe_ced/tests/conftest.py",
+      "original_sha256": "ae7c19e9443ca20bcf6827c2db1dd48ffef5880ce2dca60c31021fd606857269",
+      "published_sha256": "ae7c19e9443ca20bcf6827c2db1dd48ffef5880ce2dca60c31021fd606857269",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/tests/test_end_to_end.py",
+      "published": "runtime/kd_moe_ced/tests/test_end_to_end.py",
+      "original_sha256": "62aa50ea0e3837ef26efd0b3dca1f8203492beecd2dab93b660157107e3983b6",
+      "published_sha256": "62aa50ea0e3837ef26efd0b3dca1f8203492beecd2dab93b660157107e3983b6",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/tests/test_frontend.py",
+      "published": "runtime/kd_moe_ced/tests/test_frontend.py",
+      "original_sha256": "041b685ed834c67a6278ae3560b861fbf005b266d972a46adaf569ad2679640f",
+      "published_sha256": "041b685ed834c67a6278ae3560b861fbf005b266d972a46adaf569ad2679640f",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/tests/test_router.py",
+      "published": "runtime/kd_moe_ced/tests/test_router.py",
+      "original_sha256": "6b30e3c874cc495040c0c5050fb9fb7eaa87395ae00b8e700e4aa1aa1eba13a4",
+      "published_sha256": "6b30e3c874cc495040c0c5050fb9fb7eaa87395ae00b8e700e4aa1aa1eba13a4",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/tests/test_split_moe.py",
+      "published": "runtime/kd_moe_ced/tests/test_split_moe.py",
+      "original_sha256": "5ab4972f3bfe4d850610c89a551376947f6464f6733ea1f364466ee8085d33bf",
+      "published_sha256": "5ab4972f3bfe4d850610c89a551376947f6464f6733ea1f364466ee8085d33bf",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/tests/test_vit_grep.py",
+      "published": "runtime/kd_moe_ced/tests/test_vit_grep.py",
+      "original_sha256": "a4beb10b4e8e5d7a44321b593ffe3d7553891a54134728b2e32cef55c29aca77",
+      "published_sha256": "a4beb10b4e8e5d7a44321b593ffe3d7553891a54134728b2e32cef55c29aca77",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/config/beat.yaml",
+      "published": "runtime/kd_moe_ced/config/beat.yaml",
+      "original_sha256": "92577f5d4d645e59f1672f9b3aedc601fdaa3d469fd5c4e95d0a85250fbb47d1",
+      "published_sha256": "92577f5d4d645e59f1672f9b3aedc601fdaa3d469fd5c4e95d0a85250fbb47d1",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/config/config.yaml",
+      "published": "runtime/kd_moe_ced/config/config.yaml",
+      "original_sha256": "95034c077c8c2675141df83befc812f6f34ce471a9625007ad8855c935c5861d",
+      "published_sha256": "95034c077c8c2675141df83befc812f6f34ce471a9625007ad8855c935c5861d",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/champion_pipeline.py",
+      "published": "runtime/kd_moe_ced/champion_pipeline.py",
+      "original_sha256": "d9e026240fddcec21dcdd3f0e1697c14dc1c03f11153deedca2a008e0d59f367",
+      "published_sha256": "926fa71af976cd67d2dcf023e337b10cdd0a75d3300d2bd3255cfc8cdde839d0",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_smoke_20261102/runtime/train_kd_moe.py",
+      "published": "runtime/kd_moe_ced/train_kd_moe.py",
+      "original_sha256": "026f54f86499650c7c153a12dbef066a4c6d37400d35e074ca4e6c8ec2e7ae0b",
+      "published_sha256": "026f54f86499650c7c153a12dbef066a4c6d37400d35e074ca4e6c8ec2e7ae0b",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_research_20261102/hf_revision.json",
+      "published": "config/hf_dataset_revision.json",
+      "original_sha256": "8bbd28cc779520a464de8cf67022b4956e05cdb2266c41cb3df45e7bc044bdd0",
+      "published_sha256": "be35948aff0f56d564d82674ea0f8f24dd7cfb60aad7d10691ffbaa9ec31ca6e",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/team_kd_moe_research_20261102/hf_api.json",
+      "published": "config/hf_dataset_files.json",
+      "original_sha256": "459b06b53c6a5889fe8c5761d9ed217699eafd410dc66140afcf7ba4847ae17e",
+      "published_sha256": "459b06b53c6a5889fe8c5761d9ed217699eafd410dc66140afcf7ba4847ae17e",
+      "portability_edit": false
+    },
+    {
+      "source": "benchmark_results/ce9_clean_mixture_20261102/CONFIG_9_MODELS.json",
+      "published": "config/ce9_original_run.json",
+      "original_sha256": "2ce11e12838494f2a731b483c47ec45cafc2ae38f9d69ea3aa8199c42c36688a",
+      "published_sha256": "b89bf64ec14cc857a8ac7b7399c2d2ddde4c658246e0be1e7190e4fa00f2678c",
+      "portability_edit": false
+    }
+  ],
+  "published_line_endings": "LF"
+}
