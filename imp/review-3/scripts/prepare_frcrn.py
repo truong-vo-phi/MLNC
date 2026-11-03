@@ -44,8 +44,10 @@ def prepare_frcrn(data_dir, cache_dir, remove_archive=False):
                 member = "mix-dataset-v2/" + name
                 target = manifest_root / name
                 target.parent.mkdir(parents=True, exist_ok=True)
-                with z.open(member) as inp, target.open("wb") as out:
+                temporary = target.with_suffix(target.suffix + ".extracting")
+                with z.open(member) as inp, temporary.open("wb") as out:
                     shutil.copyfileobj(inp, out, 8 * 1024 * 1024)
+                temporary.replace(target)
         if remove_archive:
             archive.unlink()
     for split, expected in source["manifest_sha256"].items():
@@ -62,8 +64,10 @@ def prepare_frcrn(data_dir, cache_dir, remove_archive=False):
         with ZipFile(archive) as z:
             for item in source["arrays"].values():
                 target = cache_dir / item["file"]
-                with z.open(item["file"]) as inp, target.open("wb") as out:
+                temporary = target.with_suffix(target.suffix + ".extracting")
+                with z.open(item["file"]) as inp, temporary.open("wb") as out:
                     shutil.copyfileobj(inp, out, 8 * 1024 * 1024)
+                temporary.replace(target)
                 print("Extracted FRCRN", item["file"], flush=True)
         if remove_archive:
             archive.unlink()
