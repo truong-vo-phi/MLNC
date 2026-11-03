@@ -66,7 +66,9 @@ def resolve_model_config(model_name, config):
                             "implementation": "verified original pretrained loaders" if effective.get("initialization",{}).get("mode")=="official_pretrained" else "existing Review-3 constructors",
                             "profile": profile_key if profile else "common + user-selected previous baseline LRs",
                             "original_run_json_executed": False,
-                            "architecture_policy": "retain Review-3 backbone, pooling and initialization; KD-profile architecture fields not applied",
+                            "architecture_policy": ("native verified pretrained backbone and pooling; replace only task head; KD architecture fields not applied"
+                                if effective.get("initialization",{}).get("mode")=="official_pretrained" else
+                                "retain Review-3 backbone, pooling and initialization; KD-profile architecture fields not applied"),
                             "selection": "mean Balanced Accuracy over six SNRs, present classes in each SNR",
                             "report_weights": "best_raw"}
     training["micro_batch_size"] = min(int(training["batch_size"]), {"beats": 8, "ced_small": 16, "vit_s": 16, "mobilevit": 16}.get(model_name, 32))
