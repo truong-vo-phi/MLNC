@@ -75,10 +75,8 @@ class Trainer:
         self.drive_dir = None
         drive_root = self.config.get("logging", {}).get("drive_dir")
         if drive_root:
-            from gdrive_fsspec import GoogleDriveFileSystem
-            # gdrive-fsspec's writer appends uploaded metadata into the parent
-            # dircache. Disabling listings caching raises KeyError after upload.
-            self.drive_fs = GoogleDriveFileSystem(use_listings_cache=True, skip_instance_cache=True, token="cache")
+            from src.drive_checkpoint import DriveCheckpointStore
+            self.drive_fs = DriveCheckpointStore()
             self.drive_dir = str(drive_root).strip("/") + "/" + model_name
             self.drive_fs.makedirs(self.drive_dir, exist_ok=True)
             self._restore_drive()
