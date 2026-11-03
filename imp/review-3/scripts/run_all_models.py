@@ -227,7 +227,11 @@ def train_single_model(model_name, config, epochs=None, batch_size=None, device=
                           "eval_ids_sha256":hashlib.sha256("\n".join(val_ids).encode()).hexdigest()}
     config["dataset"]["class_names"]=train_ds.class_names
     if d.get("input_kind") == "frcrn":
-        config["data_audit"]["frcrn_cache"] = train_ds.cache_provenance
+        identity = copy.deepcopy(train_ds.cache_provenance)
+        # Extraction timestamps change across cloud sessions; content hashes do not.
+        for entry in identity["files"].values():
+            entry.pop("mtime_ns", None)
+        config["data_audit"]["frcrn_cache"] = identity
     if smoke_test:
         train_ds=Subset(train_ds,_stratified_indices(train_ds))
         val_ds=Subset(val_ds,_stratified_indices(val_ds))
