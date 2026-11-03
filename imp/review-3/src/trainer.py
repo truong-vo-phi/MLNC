@@ -76,7 +76,9 @@ class Trainer:
         drive_root = self.config.get("logging", {}).get("drive_dir")
         if drive_root:
             from gdrive_fsspec import GoogleDriveFileSystem
-            self.drive_fs = GoogleDriveFileSystem(use_listings_cache=False, skip_instance_cache=True, token="cache")
+            # gdrive-fsspec's writer appends uploaded metadata into the parent
+            # dircache. Disabling listings caching raises KeyError after upload.
+            self.drive_fs = GoogleDriveFileSystem(use_listings_cache=True, skip_instance_cache=True, token="cache")
             self.drive_dir = str(drive_root).strip("/") + "/" + model_name
             self.drive_fs.makedirs(self.drive_dir, exist_ok=True)
             self._restore_drive()
@@ -129,6 +131,8 @@ class Trainer:
         if self.drive_fs is None:
             return
         try:
+            self.drive_fs.invalidate_cache(self.drive_dir)
+            self.drive_fs.ls(self.drive_dir)
             def upload(local,remote):
                 self.drive_fs.put_file(str(self.checkpoint_dir/local),self.drive_dir+"/"+remote)
             if improved or final:

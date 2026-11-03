@@ -31,6 +31,12 @@ class MemoryDrive:
     def exists(self, path):
         return path in self.files
 
+    def invalidate_cache(self, path):
+        pass
+
+    def ls(self, path):
+        return [name for name in self.files if name.startswith(path + "/")]
+
     def open(self, path, mode):
         assert mode == "rb"
         return io.BytesIO(self.files[path])
