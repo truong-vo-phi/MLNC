@@ -1,4 +1,11 @@
 {
+  "panns_cnn10_mirror": {
+    "repo": "niobures/PANNs",
+    "revision": "0f825ec3203fe31225814501598adc3af18a8203",
+    "filename": "models/pretrained/Cnn10_mAP=0.380.pth",
+    "sha256": "5240bdc47444e331bbeb54fd741d2b3f933a4526e84b0c17bf3593df94b13962",
+    "note": "Transport mirror; exact SHA256 match to the original Zenodo checkpoint"
+  },
   "beats": {
     "repo": "WeiChihChen/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2",
     "revision": "172e4071a2912392d9151c70750b9a12f55fc54e",

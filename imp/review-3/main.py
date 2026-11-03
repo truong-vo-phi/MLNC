@@ -84,8 +84,16 @@ def cmd_prepare(args):
     spec=importlib.util.spec_from_file_location("_review3_asset_download",sibling/"prepare_ce9.py")
     prepare=importlib.util.module_from_spec(spec);spec.loader.exec_module(prepare)
     prepare.ASSETS=assets
-    checkpoints=[("https://zenodo.org/records/3987831/files/Cnn10_mAP%3D0.380.pth?download=1","Cnn10_mAP=0.380.pth"),
-                 ("https://github.com/fschmid56/EfficientAT/releases/download/v0.0.1/mn10_as_mAP_471.pt","mn10_as_mAP_471.pt")]
+    # The Zenodo stream can stall on cloud hosts. This pinned mirror is byte-identical.
+    pann=sources["panns_cnn10_mirror"]
+    pann_target=assets/"Cnn10_mAP=0.380.pth"
+    if not pann_target.is_file():
+        downloaded=hf_hub_download(pann["repo"],pann["filename"],revision=pann["revision"],local_dir=assets)
+        if _file_sha256(downloaded)!=pann["sha256"]:raise ValueError("PANN mirror SHA256 mismatch")
+        shutil.copyfile(downloaded,pann_target)
+    if _file_sha256(pann_target)!=pann["sha256"]:raise ValueError("PANN pretrained SHA256 mismatch")
+    print("Verified pretrained: Cnn10_mAP=0.380.pth",flush=True)
+    checkpoints=[("https://github.com/fschmid56/EfficientAT/releases/download/v0.0.1/mn10_as_mAP_471.pt","mn10_as_mAP_471.pt")]
     for url,filename in checkpoints:
         target=Path(prepare.download(url,filename))
         if _file_sha256(target)!=sources["sha256"][filename]:raise ValueError(f"SHA256 mismatch: {filename}")
