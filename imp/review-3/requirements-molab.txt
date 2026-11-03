@@ -1,0 +1,12 @@
+# Keep Molab's CUDA-compatible torch / torchvision / torchaudio stack.
+timm==1.0.30
+einops>=0.8
+loguru>=0.7
+torchlibrosa==0.1.0
+PyYAML>=6
+soundfile>=0.12
+huggingface-hub>=0.30,<2
+safetensors>=0.5
+requests>=2.31
+scikit-learn>=1.4
+gdrive-fsspec

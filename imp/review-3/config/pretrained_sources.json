@@ -1,0 +1,16 @@
+{
+  "beats": {
+    "repo": "WeiChihChen/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2",
+    "revision": "172e4071a2912392d9151c70750b9a12f55fc54e",
+    "filename": "BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt",
+    "sha256": "e5815275a04b6885e7b8af63d120b29bffae2cd2225cf4915e1ec6d819d3022c",
+    "note": "Public transport mirror; SHA256 matches the previously verified official checkpoint"
+  },
+  "sha256": {
+    "Cnn10_mAP=0.380.pth": "5240bdc47444e331bbeb54fd741d2b3f933a4526e84b0c17bf3593df94b13962",
+    "mn10_as_mAP_471.pt": "0bd7dc2443af498c289a2e739f02ebb515d6aa3fd3ab9db539c86123ae368a4e",
+    "ced_mini/model.safetensors": "e4070d02ca53ec7a1df83bbf779a0e70bc2bbc0a9bacde6330e1dc37c990b215",
+    "ced_small/model.safetensors": "a495e319a620dec4c8b7ca7bb927667ed68169a9efc1a943ccbf5d5c6f9c0c71",
+    "ced_tiny/model.safetensors": "0e086f0cd62814c6def89001f3f25193f75955696f6975ef6800af31d00d6dd7"
+  }
+}

@@ -41,6 +41,101 @@ from src.trainer import Trainer
 from src.utils import count_parameters, set_seed, setup_logger
 
 
+def _file_sha256(path):
+    h=hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for chunk in iter(lambda:stream.read(8*1024*1024),b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def cmd_prepare(args):
+    """CPU/network-only preparation; download only raw train/eval and genuine weights."""
+    import importlib.util
+    import shutil
+    import zipfile
+    from huggingface_hub import hf_hub_download
+    sibling=PACKAGE_ROOT.parent/"mix_dataset_v2"
+    assets=(PACKAGE_ROOT/"pretrained").resolve()
+    assets.mkdir(exist_ok=True)
+    sources=json.loads((PACKAGE_ROOT/"config/pretrained_sources.json").read_text())
+    if not args.skip_data:
+        data=Path(args.data_dir).resolve()
+        data.mkdir(parents=True,exist_ok=True)
+        if not (data/"mix-dataset-v2/eval/manifest.csv").is_file():
+            revision=json.loads((sibling/"config/hf_dataset_revision.json").read_text())["revision"]
+            tree=json.loads((sibling/"config/hf_dataset_files.json").read_text())
+            info=next(x for x in tree if x["path"]=="mix-dataset-v2.zip")
+            if shutil.disk_usage(data).free < info["size"]+9*2**30:
+                raise RuntimeError("Need about 18 GiB free for ZIP + extraction; checkpoints need additional space")
+            spec=importlib.util.spec_from_file_location("_review3_dataset_download",sibling/"download_team_mix_v2.py")
+            download=importlib.util.module_from_spec(spec);spec.loader.exec_module(download)
+            archive=download.download_ranges("phitruong0606/mix-dataset-v2",revision,"mix-dataset-v2.zip",data,info["size"])
+            if _file_sha256(archive)!=info["lfs"]["oid"]:raise ValueError("Dataset SHA256 mismatch")
+            destination=data.resolve()
+            with zipfile.ZipFile(archive) as z:
+                chosen=[entry for entry in z.infolist() if entry.filename.startswith(("mix-dataset-v2/train/","mix-dataset-v2/eval/")) or entry.filename=="mix-dataset-v2/labels.txt"]
+                for i,entry in enumerate(chosen,1):
+                    if not (destination/entry.filename).resolve().is_relative_to(destination):raise ValueError("Unsafe ZIP path")
+                    z.extract(entry,destination)
+                    if i%5000==0:print(f"Extracted {i}/{len(chosen)} train/eval entries",flush=True)
+            if args.remove_archive:archive.unlink()
+        print("Raw train/eval dataset ready:",data/"mix-dataset-v2",flush=True)
+    spec=importlib.util.spec_from_file_location("_review3_asset_download",sibling/"prepare_ce9.py")
+    prepare=importlib.util.module_from_spec(spec);spec.loader.exec_module(prepare)
+    prepare.ASSETS=assets
+    checkpoints=[("https://zenodo.org/records/3987831/files/Cnn10_mAP%3D0.380.pth?download=1","Cnn10_mAP=0.380.pth"),
+                 ("https://github.com/fschmid56/EfficientAT/releases/download/v0.0.1/mn10_as_mAP_471.pt","mn10_as_mAP_471.pt")]
+    for url,filename in checkpoints:
+        target=Path(prepare.download(url,filename))
+        if _file_sha256(target)!=sources["sha256"][filename]:raise ValueError(f"SHA256 mismatch: {filename}")
+        print("Verified pretrained:",filename,flush=True)
+    revisions={"ced_tiny":"ace276d29dd0bb3f3517b0fa8cf300738c409019","ced_mini":"26c3ebcae85d4330f4fc26763f029539a3afcda0","ced_small":"06bb40c5ec089e96867ebc5246be02441f4a71e4"}
+    for name,revision in revisions.items():
+        for filename in ("config.json","model.safetensors"):
+            target=hf_hub_download("mispeech/"+name.replace("_","-"),filename,revision=revision,local_dir=assets/name)
+            key=name+"/"+filename
+            if key in sources["sha256"] and _file_sha256(target)!=sources["sha256"][key]:raise ValueError(f"SHA256 mismatch: {key}")
+        print("Verified pretrained:",name,flush=True)
+    beats=sources["beats"]
+    target=hf_hub_download(beats["repo"],beats["filename"],revision=beats["revision"],local_dir=assets)
+    if _file_sha256(target)!=beats["sha256"]:raise ValueError("BEATs pretrained SHA256 mismatch")
+    print("Verified official BEATs contents by SHA256. No training was started.",flush=True)
+
+
+def cmd_preflight(args):
+    import gc
+    import numpy as np
+    from scripts.run_all_models import CANONICAL_MODELS,resolve_model_config,configure_existing_model
+    config=yaml.safe_load((PACKAGE_ROOT/args.config).read_text(encoding="utf-8"))
+    config["_models_config"]=str(PACKAGE_ROOT/"config/models.yaml")
+    if args.assets:
+        config["initialization"]["assets_dir"]=str(Path(args.assets).resolve())
+    if args.beats_checkpoint:
+        config["initialization"]["beats_checkpoint"]=str(Path(args.beats_checkpoint).resolve())
+    if config.get("initialization",{}).get("mode")!="official_pretrained":raise ValueError("Preflight requires official_pretrained mode")
+    selected=CANONICAL_MODELS if args.model=="all" else [args.model]
+    torch.set_num_threads(4)
+    receipt={}
+    for name in selected:
+        cfg=resolve_model_config(name,config)
+        set_seed(cfg["training"]["seed"])
+        model=configure_existing_model(name,cfg).to(args.device).eval()
+        with torch.inference_mode():
+            logits=model(torch.randn(1,64000,device=args.device)*.05)
+        if logits.shape!=(1,36) or not torch.isfinite(logits).all():raise ValueError("Invalid pretrained forward")
+        if not model.receipt.get("verified_pretrained_loader"):raise ValueError("Unverified initialization")
+        total,trainable=count_parameters(model)
+        receipt[name]={"verified":True,"parameters":total,"trainable":trainable,"receipt":model.receipt}
+        print(f"PRETRAINED VERIFIED {name}: {total:,} parameters; forward finite; native frontend",flush=True)
+        del model,logits
+        gc.collect()
+        if args.device.startswith("cuda"):torch.cuda.empty_cache()
+    from src.trainer import write_json
+    write_json(PACKAGE_ROOT/"logs/pretrained/preflight.json",receipt)
+    print("Preflight finished. No optimizer step or training epoch was run.",flush=True)
+
+
 def cmd_list_models(args: argparse.Namespace) -> None:
     models_yaml = PACKAGE_ROOT / "config" / "models.yaml"
     with open(models_yaml, encoding="utf-8") as f:
@@ -89,6 +184,12 @@ def cmd_train(args: argparse.Namespace) -> None:
         config["training"]["explicit_cli_lr"] = args.lr
     if args.data_root:
         config["dataset"]["data_root"] = str(Path(args.data_root).resolve())
+    if args.assets:
+        config.setdefault("initialization",{})["assets_dir"]=str(Path(args.assets).resolve())
+    if args.beats_checkpoint:
+        config.setdefault("initialization",{})["beats_checkpoint"]=str(Path(args.beats_checkpoint).resolve())
+    if args.drive_dir:
+        config.setdefault("logging",{})["drive_dir"]=args.drive_dir
     if args.waveform_cache:
         config["dataset"]["waveform_cache"] = str(Path(args.waveform_cache).resolve())
     if args.workers is not None:
@@ -100,8 +201,8 @@ def cmd_train(args: argparse.Namespace) -> None:
     device_name = args.device or config["training"].get("device", "auto")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if device_name == "auto" else torch.device(device_name)
     if args.model == "all":
-        directory = PACKAGE_ROOT/"logs"
-        directory.mkdir(exist_ok=True)
+        directory = PACKAGE_ROOT/config["logging"].get("log_dir","logs")
+        directory.mkdir(parents=True,exist_ok=True)
         suffix = "smoke" if args.smoke else "group_ce"
         snapshot = directory/f"{suffix}_config_snapshot.yaml"
         registry_snapshot = directory/f"{suffix}_models_snapshot.yaml"
@@ -116,7 +217,7 @@ def cmd_train(args: argparse.Namespace) -> None:
                        "--config", str(snapshot), "--models-config", str(registry_snapshot), "--device", str(device)]
             if args.smoke:
                 command.append("--smoke")
-            print(f"REVIEW-3 {i}/9: {name}; original constructors, raw mixture, CE-only", flush=True)
+            print(f"REVIEW-3 {i}/9: {name}; initialization={config.get('initialization',{}).get('mode','review3_scratch')}; raw mixture, CE-only", flush=True)
             child = subprocess.run(command, cwd=PACKAGE_ROOT)
             if child.returncode:
                 failures.append(name)
@@ -128,7 +229,7 @@ def cmd_train(args: argparse.Namespace) -> None:
                 result=json.loads((checkpoint_dir/name/"results.json").read_text(encoding="utf-8"))
                 records.append(result)
             write_json(directory/f"{suffix}_summary.json", records)
-            lines=["# Review-3 CE-only theo cấu hình nhóm", "", "Implementation: imp/review-3; initialization retained (no added pretrained weights). Raw mixture v2; validation only.", "",
+            lines=["# Review-3 CE-only theo cấu hình nhóm", "", "Implementation and pretrained receipt are recorded per checkpoint; raw mixture v2, validation only.", "",
                    "| Model | Params (M) | Trainable (M) | Epochs | Best | acc | precision | recall | macro_f1 | micro_f1 | mAP | macro_acc selection |",
                    "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
             by_name={v["model_name"]:v for v in records}
@@ -313,6 +414,17 @@ def main():
     )
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
+    prepare=subparsers.add_parser("prepare",help="Download verified raw data and pretrained assets; no training")
+    prepare.add_argument("--data-dir",default="data")
+    prepare.add_argument("--skip-data",action="store_true")
+    prepare.add_argument("--remove-archive",action="store_true")
+    preflight=subparsers.add_parser("preflight",help="Verify genuine pretrained loads before using GPU time")
+    preflight.add_argument("--model",default="all")
+    preflight.add_argument("--config",default="config/pretrained.yaml")
+    preflight.add_argument("--device",default="cpu")
+    preflight.add_argument("--assets",default=None)
+    preflight.add_argument("--beats-checkpoint",default=None)
+
     # list-models
     subparsers.add_parser("list-models", help="List all 9 models with parameters and families")
 
@@ -328,10 +440,13 @@ def main():
     parser_train.add_argument("--data-root", type=str, default=None, help="Root path of mixture dataset")
     parser_train.add_argument("--waveform-cache", type=str, default=None, help="Verified raw-mixture cache directory; never FRCRN cache")
     parser_train.add_argument("--models-config", type=str, default=None, help="Snapshot of model profiles")
+    parser_train.add_argument("--assets",type=str,default=None)
+    parser_train.add_argument("--beats-checkpoint",type=str,default=None)
+    parser_train.add_argument("--drive-dir",type=str,default=None,help="Own Google Drive destination; cached login required")
     parser_train.add_argument("--workers", type=int, default=None)
     parser_train.add_argument("--smoke", action="store_true", help="Quick 1-epoch smoke test run")
     parser_train.add_argument("--device", type=str, default="auto", help="Compute device ('cuda', 'cpu', 'auto')")
-    parser_train.add_argument("--config", type=str, default="config/config.yaml", help="Path to config.yaml")
+    parser_train.add_argument("--config", type=str, default="config/pretrained.yaml", help="Path to config.yaml")
 
     # eval
     parser_eval = subparsers.add_parser("eval", help="Evaluate a trained checkpoint across SNR levels")
@@ -383,7 +498,11 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "list-models":
+    if args.command == "prepare":
+        cmd_prepare(args)
+    elif args.command == "preflight":
+        cmd_preflight(args)
+    elif args.command == "list-models":
         cmd_list_models(args)
     elif args.command == "verify":
         cmd_verify(args)

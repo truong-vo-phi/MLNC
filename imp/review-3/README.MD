@@ -1,5 +1,14 @@
 # Review-3: Phân Loại Âm Thanh Nhiễu Dưới Tiếng Nói Đa Mức SNR
 
+## Chạy lại pretrained trên mixture v2
+
+Lệnh `main.py train` hiện mặc định dùng `config/pretrained.yaml`: nạp backbone
+pretrained thật từ loader đã có ở `imp/mix_dataset_v2`, thay head 36 lớp và
+fine-tune CE-only. Không dùng FRCRN/KD/MoE trong lượt này. Xem
+[hướng dẫn Molab](HUONG_DAN_MOLAB_VI.md) và notebook [molab.py](molab.py).
+Config `config/config.yaml` và các constructor scratch cũ được giữ để truy vết;
+các mô tả KD/kiến trúc scratch bên dưới không phải cấu hình lượt pretrained này.
+
 Dự án tự chứa tại `imp/review-3`, thực hiện:
 - **Tác vụ 1**: Cho tập dữ liệu hỗn hợp (Mixture Audio: Tiếng nói + Nhiễu môi trường trên 6 mức SNR từ $-5\text{ dB}$ đến $20\text{ dB}$) vào **9 kiến trúc mô hình học sâu đại diện** thuộc 4 họ kiến trúc chính (CNN, Audio-Transformer, Vision-Transformer, Hybrid).
 - **Tác vụ 2**: Đánh giá 9 mô hình sau khi hỗn hợp đi qua **mặt nạ lọc FRCRN (FRCRN Masking)**, nạp trực tiếp sóng âm nhiễu ước lượng $\hat{\mathbf{n}}$ từ file `.npy` (memory-mapped cache) kèm chuẩn hóa năng lượng RMS ($\sigma_0 \approx 0.07925$), đo lường toàn diện với bộ 6 metrics (`acc`, `precision`, `recall`, `macro_f1`, `micro_f1`, `mAP`) và bảng phân rã theo từng mức SNR.

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import argparse
 import copy
+import importlib.util
+import types
 import hashlib
 import inspect
 import numpy as np
@@ -60,8 +62,8 @@ def resolve_model_config(model_name, config):
         if key in masks:
             front["specaug_"+key] = masks[key]
     effective["ce_only"] = {"input": "raw mixture v2", "teacher": False, "kd": False, "moe": False,
-                            "stage1_epochs_applied": 0, "pretrained": False,
-                            "implementation": "existing imp/review-3 model constructors, unchanged",
+                            "stage1_epochs_applied": 0, "pretrained": effective.get("initialization",{}).get("mode")=="official_pretrained",
+                            "implementation": "verified original pretrained loaders" if effective.get("initialization",{}).get("mode")=="official_pretrained" else "existing Review-3 constructors",
                             "profile": profile_key if profile else "common + user-selected previous baseline LRs",
                             "original_run_json_executed": False,
                             "architecture_policy": "retain Review-3 backbone, pooling and initialization; KD-profile architecture fields not applied",
@@ -76,6 +78,8 @@ def resolve_model_config(model_name, config):
 
 
 def configure_existing_model(model_name, config):
+    if config.get("initialization",{}).get("mode")=="official_pretrained":
+        return configure_pretrained_model(model_name,config)
     from src.frontend import LogMel, SpecAugment
     from timm.layers import DropPath
     front = config["frontend"]
@@ -91,6 +95,81 @@ def configure_existing_model(model_name, config):
             # Apply the requested residual regularizer; retain existing block forward and weights.
             block.proj_drop = torch.nn.Sequential(block.proj_drop, DropPath(probability))
             block.mlp.add_module("configured_drop_path", DropPath(probability))
+    return model
+
+
+class _NativeSpecTransform(torch.nn.Module):
+    """Frame count and existing SpecAugment only; no learnable adapter or backbone."""
+    def __init__(self, config):
+        super().__init__()
+        from src.frontend import SpecAugment
+        front=config["frontend"]
+        self.frames=front["num_frames"]
+        self.mask=SpecAugment(**{k:front["specaug_"+k] for k in ("freq_masks","freq_width","time_masks","time_width")})
+
+    def forward(self,x):
+        x=x.unsqueeze(1)
+        if x.shape[-1]<self.frames:
+            x=torch.nn.functional.pad(x,(0,self.frames-x.shape[-1]))
+        else:
+            x=x[...,:self.frames]
+        return self.mask(x).squeeze(1)
+
+
+def configure_pretrained_model(model_name,config):
+    from timm.layers import DropPath
+    path=PACKAGE_ROOT.parent/"mix_dataset_v2/noise_pipeline/ce9_models.py"
+    if not path.is_file():
+        raise FileNotFoundError("The verified pretrained library from this MLNC branch is required")
+    name="_review3_verified_pretrained"
+    if name not in sys.modules:
+        spec=importlib.util.spec_from_file_location(name,path)
+        module=importlib.util.module_from_spec(spec)
+        sys.modules[name]=module
+        spec.loader.exec_module(module)
+    module=sys.modules[name]
+    mapping={"pann_cnn10":"panns_cnn10","efficient_mn10":"efficientat_mn10","vit_s":"vit_small","mobilevit":"mobilevit_s","mobilenet":"mobilenet_v3_large","beats":"beats12"}
+    initialization=config["initialization"]
+    assets=Path(initialization["assets_dir"])
+    if not assets.is_absolute(): assets=PACKAGE_ROOT/assets
+    beats=Path(initialization["beats_checkpoint"])
+    if not beats.is_absolute(): beats=PACKAGE_ROOT/beats
+    if model_name=="beats" and not beats.is_file(): raise FileNotFoundError(beats)
+    paths_file=path.parents[1]/"benchmark_results/team_kd_moe_research_20261102/TEAM_DATA_PATHS.json"
+    paths_file.parent.mkdir(parents=True,exist_ok=True)
+    local=json.loads(paths_file.read_text(encoding="utf-8")) if paths_file.is_file() else {}
+    local["beats_pretrained"]=str(beats.resolve())
+    paths_file.write_text(json.dumps(local,indent=2),encoding="utf-8")
+    model=module.build_model(mapping.get(model_name,model_name),assets,classes=config["dataset"]["num_classes"])
+    model.group_spec=_NativeSpecTransform(config)
+    if model_name.startswith("ced_"):
+        model.model.front_end.register_forward_hook(lambda m,i,o:model.group_spec(o))
+        for i,block in enumerate(model.model.blocks):
+            probability=float(config["training"].get("drop_path",0))*i/max(len(model.model.blocks)-1,1)
+            block.drop_path1=DropPath(probability) if probability else torch.nn.Identity()
+            block.drop_path2=DropPath(probability) if probability else torch.nn.Identity()
+    elif model_name=="pann_cnn10":
+        model.model.bn0.register_forward_hook(lambda m,i,o:model.group_spec(o.squeeze(-1)).unsqueeze(-1))
+    elif model_name=="efficient_mn10":
+        model.frontend.register_forward_hook(lambda m,i,o:model.group_spec(o))
+    elif model_name=="beats":
+        original=model.encoder.preprocess
+        def preprocess(source,**kwargs):
+            return model.group_spec(original(source,**kwargs).transpose(1,2)).transpose(1,2)
+        model.encoder.preprocess=preprocess
+    else:
+        def forward(native,wave):
+            with torch.autocast(wave.device.type,enabled=False):
+                x=native.db(native.mel(wave.float()))
+                x=(x-x.mean((1,2),keepdim=True))/(x.std((1,2),keepdim=True)+1e-5)
+                x=(native.group_spec(x).clamp(-3,3)+3)/6
+                x=torch.nn.functional.interpolate(x[:,None],native.size,mode="bilinear",align_corners=False).expand(-1,3,-1,-1)
+                x=(x-native.mean)/native.std
+            return native.model(x)
+        model.forward=types.MethodType(forward,model)
+    model.receipt["verified_pretrained_loader"]=True
+    model.receipt["adapter_sha256"]=hashlib.sha256(path.read_bytes()).hexdigest()
+    model.receipt["frontend_policy"]="native pretrained frontend; only group frame cropping and SpecAugment added"
     return model
 
 
@@ -121,7 +200,7 @@ def train_single_model(model_name, config, epochs=None, batch_size=None, device=
     log_dir = PACKAGE_ROOT/config["logging"].get("log_dir", "logs")
     log_file = log_dir/(model_name+("_smoke" if smoke_test else "_group_ce")+".log")
     logger = setup_logger(name="train_"+model_name,log_file=log_file)
-    logger.info("Original Review-3 constructors retained. No pretrained checkpoints loaded.")
+    logger.info("Initialization: %s",config.get("initialization",{}).get("mode","review3_scratch"))
     kwargs = dict(root=d["data_root"], sample_rate=d["sample_rate"],duration=d["duration"],num_classes=d["num_classes"],waveform_cache=d.get("waveform_cache"))
     train_ds=MixtureDataset(split="train",**kwargs)
     val_ds=MixtureDataset(split="eval",**kwargs)
@@ -148,8 +227,10 @@ def train_single_model(model_name, config, epochs=None, batch_size=None, device=
     val_loader=DataLoader(val_ds,batch_size=min(8,t["eval_batch_size"]) if smoke_test else t["eval_batch_size"],shuffle=False,**loader_kwargs)
     model=configure_existing_model(model_name,config)
     source=Path(inspect.getfile(type(model)))
-    config["model_source"]={"class":type(model).__module__+"."+type(model).__name__,"file":str(source.relative_to(PACKAGE_ROOT)),
-                            "sha256":hashlib.sha256(source.read_bytes()).hexdigest(),"external_pretrained_loaded":False}
+    config["model_source"]={"class":type(model).__module__+"."+type(model).__name__,"file":os.path.relpath(source,PACKAGE_ROOT),
+                            "sha256":hashlib.sha256(source.read_bytes()).hexdigest(),"external_pretrained_loaded":bool(config["ce_only"]["pretrained"])}
+    if config["ce_only"]["pretrained"]:
+        config["pretrained_receipt"]=model.receipt
     directory=PACKAGE_ROOT/config["logging"].get("checkpoint_dir","checkpoints")
     if smoke_test:
         directory=directory/"smoke"

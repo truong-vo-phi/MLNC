@@ -71,6 +71,15 @@ class Trainer:
         self.first_epoch = 0
         self.last_predictions = None
         self.train_mAP = 0.
+        self.drive_fs = None
+        self.drive_dir = None
+        drive_root = self.config.get("logging", {}).get("drive_dir")
+        if drive_root:
+            from gdrive_fsspec import GoogleDriveFileSystem
+            self.drive_fs = GoogleDriveFileSystem(use_listings_cache=False, skip_instance_cache=True, token="cache")
+            self.drive_dir = str(drive_root).strip("/") + "/" + model_name
+            self.drive_fs.makedirs(self.drive_dir, exist_ok=True)
+            self._restore_drive()
         last = self.checkpoint_dir / "last.pt"
         if last.is_file():
             state = torch.load(last, map_location="cpu", weights_only=False)
@@ -93,6 +102,65 @@ class Trainer:
                 self.train_loader.sampler.generator.set_state(state["sampler_rng"])
             del state
 
+    def _restore_drive(self):
+        if (self.checkpoint_dir/"last.pt").is_file():
+            return
+        marker=self.drive_dir+"/resume_manifest.json"
+        if not self.drive_fs.exists(marker):
+            return
+        with self.drive_fs.open(marker,"rb") as stream:
+            manifest=json.loads(stream.read())
+        staged=[]
+        for field,local in (("best","best.pt"),("last","last.pt")):
+            name=manifest[field]["file"]
+            if not re.fullmatch(r"(?:last|resume_best)_e\d+\.pt",name):
+                raise ValueError("Invalid checkpoint backup filename")
+            target=self.checkpoint_dir/local
+            temp=target.with_suffix(".restore.pt")
+            self.drive_fs.get_file(self.drive_dir+"/"+name,str(temp))
+            if hashlib.sha256(temp.read_bytes()).hexdigest()!=manifest[field]["sha256"]:
+                raise ValueError("Checkpoint backup SHA256 mismatch")
+            staged.append((temp,target))
+        for temp,target in staged:
+            temp.replace(target)
+        self.logger.info("Restored matching last/best checkpoint pair from Drive at epoch %d",manifest["epoch"])
+
+    def _backup_drive(self,epoch,improved=False,final=False):
+        if self.drive_fs is None:
+            return
+        try:
+            def upload(local,remote):
+                self.drive_fs.put_file(str(self.checkpoint_dir/local),self.drive_dir+"/"+remote)
+            if improved or final:
+                upload("best.pt","best.pt")
+            for name in ("history.json","history.csv","effective_config.json","optimizer_groups.json"):
+                if (self.checkpoint_dir/name).exists():upload(name,name)
+            interval=int(self.config.get("logging",{}).get("backup_every_epochs",5))
+            if epoch==1 or epoch%interval==0 or final:
+                marker=self.drive_dir+"/resume_manifest.json"
+                previous={}
+                if self.drive_fs.exists(marker):
+                    with self.drive_fs.open(marker,"rb") as stream:previous=json.loads(stream.read())
+                manifest={"epoch":epoch,"best_epoch":self.best_epoch}
+                for field,local,name in (("last","last.pt",f"last_e{epoch:03d}.pt"),("best","best.pt",f"resume_best_e{epoch:03d}.pt")):
+                    upload(local,name)
+                    manifest[field]={"file":name,"sha256":hashlib.sha256((self.checkpoint_dir/local).read_bytes()).hexdigest()}
+                local_marker=self.checkpoint_dir/"resume_manifest.json"
+                write_json(local_marker,manifest)
+                self.drive_fs.put_file(str(local_marker),marker)
+                # Retain the previous valid generation until the new manifest is committed.
+                for field in ("last","best"):
+                    old=previous.get(field,{}).get("file","")
+                    if old and old!=manifest[field]["file"] and re.fullmatch(r"(?:last|resume_best)_e\d+\.pt",old):
+                        self.drive_fs.rm(self.drive_dir+"/"+old)
+            if final:
+                for name in ("results.json","metrics_per_snr.csv","validation_predictions.npz"):
+                    if (self.checkpoint_dir/name).exists():upload(name,name)
+            write_json(self.checkpoint_dir/"backup_status.json",{"ok":True,"epoch":epoch,"drive_dir":self.drive_dir})
+        except Exception as error:
+            self.logger.warning("Drive backup failed at epoch %d (%s); local checkpoint is retained",epoch,type(error).__name__)
+            write_json(self.checkpoint_dir/"backup_status.json",{"ok":False,"epoch":epoch,"error_type":type(error).__name__})
+
     def _parameter_groups(self):
         training = self.config.get("training", {})
         head_lr = float(training.get("head_lr", self.lr))
@@ -102,14 +170,14 @@ class Trainer:
         for name, p in self.model.named_parameters():
             if not p.requires_grad:
                 continue
-            head = name.startswith("head.") or ".head." in name or ".classifier." in name
+            head = name.startswith("head.") or any(k in name for k in (".head.",".classifier.",".fc_audioset.",".outputlayer.1."))
             reference = head_lr if head else self.lr
             scale = 1.
             if self.model_name.startswith("ced_") and layer_decay < 1 and not head:
                 match = re.search(r"(?:^|\.)blocks\.(\d+)\.", name)
                 if match:
                     scale = layer_decay ** (11-int(match[1]))
-                elif any(k in name for k in ("patch_embed", "cls_token", "rel_pos_bias")):
+                elif any(k in name for k in ("patch_embed", "cls_token", "rel_pos_bias", "freq_pos_embed", "time_pos_embed")):
                     scale = layer_decay ** 12
             decay = 0. if any(k in name for k in no_decay) else self.weight_decay
             key = (reference, scale, decay)
@@ -244,6 +312,7 @@ class Trainer:
                 temp.replace(self.checkpoint_dir/"best.pt")
             del state
             self._save_history()
+            self._backup_drive(epoch,improved=better)
         best = torch.load(self.checkpoint_dir/"best.pt", map_location="cpu", weights_only=False)
         self.model.load_state_dict(best["model_state_dict"], strict=True)
         val_loss, metrics, breakdown = self.evaluate(self.val_loader)
@@ -259,9 +328,11 @@ class Trainer:
                   "metric_for_best": self.metric_for_best, "epochs_ran": len(self.history), "history": self.history,
                   "validation": metrics, "snr_breakdown": breakdown, "val_loss": val_loss,
                   "parameters": total_p, "trainable": train_p, "test_evaluated": False, "test": {},
-                  "initialization": "unchanged Review-3 constructors; no external pretrained checkpoint loaded",
+                  "initialization": self.config.get("initialization", {"mode":"review3_scratch"}),
+                  "pretrained_receipt": self.config.get("pretrained_receipt"),
                   "checkpoint_sha256": hashlib.sha256((self.checkpoint_dir/"best.pt").read_bytes()).hexdigest()}
         write_json(self.checkpoint_dir/"results.json", result)
         write_json(self.checkpoint_dir/"status.json", {"status": "complete", "best_epoch": self.best_epoch,
                    "epochs_ran": len(self.history), "validation": metrics})
+        self._backup_drive(self.history[-1]["epoch"],final=True)
         return result

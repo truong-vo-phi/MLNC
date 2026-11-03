@@ -12,3 +12,7 @@ logs/group_*
 logs/smoke_*
 logs/model_source_hashes_*
 *.npz
+pretrained/
+data/
+logs/pretrained/
+__marimo__/
