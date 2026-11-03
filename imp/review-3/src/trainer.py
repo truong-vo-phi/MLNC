@@ -133,10 +133,14 @@ class Trainer:
             self.drive_fs.ls(self.drive_dir)
             def upload(local,remote):
                 self.drive_fs.put_file(str(self.checkpoint_dir/local),self.drive_dir+"/"+remote)
-            if improved or final:
-                upload("best.pt","best.pt")
             for name in ("history.json","history.csv","effective_config.json","optimizer_groups.json"):
                 if (self.checkpoint_dir/name).exists():upload(name,name)
+            # Keep final metrics available even if a large resume upload fails.
+            if final:
+                for name in ("results.json","metrics_per_snr.csv","validation_predictions.npz"):
+                    if (self.checkpoint_dir/name).exists():upload(name,name)
+            if improved or final:
+                upload("best.pt","best.pt")
             interval=int(self.config.get("logging",{}).get("backup_every_epochs",5))
             if epoch==1 or epoch%interval==0 or final:
                 marker=self.drive_dir+"/resume_manifest.json"
@@ -155,13 +159,17 @@ class Trainer:
                     old=previous.get(field,{}).get("file","")
                     if old and old!=manifest[field]["file"] and re.fullmatch(r"(?:last|resume_best)_e\d+\.pt",old):
                         self.drive_fs.rm(self.drive_dir+"/"+old)
-            if final:
-                for name in ("results.json","metrics_per_snr.csv","validation_predictions.npz"):
-                    if (self.checkpoint_dir/name).exists():upload(name,name)
             write_json(self.checkpoint_dir/"backup_status.json",{"ok":True,"epoch":epoch,"drive_dir":self.drive_dir})
         except Exception as error:
-            self.logger.warning("Drive backup failed at epoch %d (%s); local checkpoint is retained",epoch,type(error).__name__)
-            write_json(self.checkpoint_dir/"backup_status.json",{"ok":False,"epoch":epoch,"error_type":type(error).__name__})
+            status={"ok":False,"epoch":epoch,"error_type":type(error).__name__,
+                    "http_status":getattr(getattr(error,"resp",None),"status",None)}
+            try:
+                body=json.loads(error.content)
+                status["api_reasons"]=[e.get("reason") for e in body.get("error",{}).get("errors",[])]
+            except (AttributeError,TypeError,ValueError):
+                pass
+            self.logger.warning("Drive backup failed: %s; local checkpoint retained",json.dumps(status))
+            write_json(self.checkpoint_dir/"backup_status.json",status)
 
     def _parameter_groups(self):
         training = self.config.get("training", {})

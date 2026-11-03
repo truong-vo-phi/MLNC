@@ -1,0 +1,23 @@
+{
+  "repo": "phitruong0606/mix-dataset-v2",
+  "revision": "ea3ce2572be476fa90b5f6424ab461330bd23b39",
+  "archive": "cache-nhat.zip",
+  "archive_size": 7800372860,
+  "archive_sha256": "45c29f251b96ddd4e117799bfe94f9f0200480c8c08233fa47ac89e393b50b3b",
+  "arrays": {
+    "train": {"file": "train.npy", "shape": [30240, 64000], "sha256": "7077ea5a147c824c8937a5ecef487324b0d178ef5dc076dffe9fde8af43cd5dd"},
+    "eval": {"file": "validation.npy", "shape": [3064, 64000], "sha256": "ed68a64f434a6e920f6cef5dea4b2bbd9ca7369cee9f77956f36242f82aa8c64"}
+  },
+  "manifest_sha256": {
+    "train": "f324d42177ca8fdd1adce15c664bc1259607c89f03ff8990ed30db561cbb8d08",
+    "eval": "6bffddc3c29d7de98d970a8520748da3397884830f9aff75a2fe813184ade8c3"
+  },
+  "labels_sha256": "989e8e19eded73f43068baf28eee301cbfda40874db57a91b82fbe46cea896ef",
+  "alignment": {
+    "cache_has_id_sidecar": false,
+    "contract": "Team cache row order equals the pinned raw manifest row order",
+    "previous_frcrn_spot_checks": 16,
+    "minimum_noise_cosine": 0.9998229189753292,
+    "note": "Spot checks establish residual-noise agreement at checked indices, not an exhaustive per-row alignment proof. Array hashes pin the exact checked cache."
+  }
+}

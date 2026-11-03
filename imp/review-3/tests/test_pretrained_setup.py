@@ -97,3 +97,18 @@ def test_failed_upload_retains_previous_manifest(tmp_path):
     trainer._backup_drive(5)
     assert trainer.drive_fs.files["own-run/beats/resume_manifest.json"] == original
     assert not json.loads((tmp_path / "backup_status.json").read_text())["ok"]
+
+
+def test_final_metrics_survive_large_checkpoint_upload_failure(tmp_path):
+    trainer = backup_trainer(tmp_path)
+    for name in ("results.json", "metrics_per_snr.csv", "validation_predictions.npz", "best.pt", "last.pt"):
+        (tmp_path / name).write_bytes(name.encode())
+    put = trainer.drive_fs.put_file
+    def fail(local, remote):
+        if remote.endswith("last_e005.pt"):
+            raise OSError("Large checkpoint transfer failed")
+        put(local, remote)
+    trainer.drive_fs.put_file = fail
+    trainer._backup_drive(5, final=True)
+    for name in ("results.json", "metrics_per_snr.csv", "validation_predictions.npz"):
+        assert trainer.drive_fs.files["own-run/beats/" + name] == name.encode()

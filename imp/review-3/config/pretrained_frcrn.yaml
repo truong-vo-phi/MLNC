@@ -1,0 +1,66 @@
+dataset:
+  name: mixture-36l
+  data_root: data/mix-dataset-v2
+  duration: 4.0
+  sample_rate: 16000
+  num_classes: 36
+  snr_levels:
+  - -5.0
+  - 0.0
+  - 5.0
+  - 10.0
+  - 15.0
+  - 20.0
+  num_workers: 4
+  waveform_cache: null
+  input_kind: frcrn
+  frcrn_cache: data/frcrn
+frontend:
+  sample_rate: 16000
+  n_fft: 512
+  win_length: 400
+  hop_length: 160
+  n_mels: 128
+  f_min: 20.0
+  f_max: 8000.0
+  num_frames: 384
+  log_eps: 1.0e-06
+  norm_eps: 1.0e-05
+  specaug_freq_masks: 2
+  specaug_freq_width: 16
+  specaug_time_masks: 2
+  specaug_time_width: 24
+training:
+  epochs: 50
+  stage1_epochs: 8
+  batch_size: 64
+  eval_batch_size: 64
+  lr: 0.0005
+  weight_decay: 0.05
+  betas:
+  - 0.9
+  - 0.999
+  warmup_ratio: 0.05
+  min_lr: 1.0e-06
+  label_smoothing: 0.1
+  grad_clip: 1.0
+  patience: 8
+  seed: 2026
+  optimizer: AdamW
+  scheduler: cosine
+  ema_decay: 0.999
+  amp: bf16
+  device: auto
+logging:
+  log_dir: logs/pretrained_frcrn
+  checkpoint_dir: checkpoints/pretrained_frcrn
+  save_best: true
+  metric_for_best: macro_acc
+  validation_subset: clean
+  expected_validation_samples: 3064
+  backup_every_epochs: 5
+initialization:
+  mode: official_pretrained
+  assets_dir: pretrained
+  beats_checkpoint: pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt
+  allow_random_backbone: false

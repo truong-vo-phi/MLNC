@@ -173,6 +173,40 @@ class MixtureDataset(Dataset):
         }
 
 
+class VerifiedFRCRNDataset(MixtureDataset):
+    """Pinned, previously spot-checked cache; never infer labels or truncate rows."""
+
+    def __init__(self, root, cache_dir, split="train", **kwargs):
+        import hashlib
+        super().__init__(root=root, split=split, **kwargs)
+        key = "eval" if split in ("eval", "val", "validation") else split
+        directory = Path(cache_dir)
+        self.cache_provenance = json.loads((directory / "frcrn_provenance.json").read_text())
+        if self.cache_provenance.get("input_kind") != "frcrn":
+            raise ValueError("Expected verified FRCRN cache")
+        source = json.loads((Path(__file__).resolve().parents[1] / "config/frcrn_sources.json").read_text())
+        info = self.cache_provenance["files"][key]
+        expected = source["arrays"][key]
+        if info["file"] != expected["file"] or info["sha256"] != expected["sha256"]:
+            raise ValueError("FRCRN source differs from the pinned team cache")
+        manifest = self.root / key / "manifest.csv"
+        if hashlib.sha256(manifest.read_bytes()).hexdigest() != source["manifest_sha256"][key]:
+            raise ValueError("FRCRN cache manifest mismatch")
+        if "labels_sha256" in source and hashlib.sha256((self.root / "labels.txt").read_bytes()).hexdigest() != source["labels_sha256"]:
+            raise ValueError("FRCRN class order differs from the raw baseline")
+        ids_hash = hashlib.sha256("\n".join(r["sample_id"] for r in self.rows).encode()).hexdigest()
+        if ids_hash != info["ids_sha256"]:
+            raise ValueError("FRCRN manifest row order mismatch")
+        self.waveform_cache = directory / info["file"]
+        stat = self.waveform_cache.stat()
+        if (stat.st_size, stat.st_mtime_ns) != (info["size"], info["mtime_ns"]):
+            raise ValueError("FRCRN array changed after verification; rerun prepare")
+        array = np.load(self.waveform_cache, mmap_mode="r", allow_pickle=False)
+        if array.shape != (len(self.rows), self.num_samples) or list(array.shape) != expected["shape"] or array.dtype != np.float32:
+            raise ValueError("FRCRN cache shape/dtype mismatch")
+        del array
+
+
 class SyntheticMixtureDataset(Dataset):
     """
     Synthetic dataset for smoke testing, offline execution, and unit verification.

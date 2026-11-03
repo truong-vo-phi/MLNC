@@ -28,7 +28,7 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 if str(PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(PACKAGE_ROOT))
 
-from src.dataset import get_dataloader, get_dataset, MixtureDataset
+from src.dataset import get_dataloader, get_dataset, MixtureDataset, VerifiedFRCRNDataset
 from src.models import build_model, list_available_models
 from src.trainer import Trainer
 from src.utils import count_parameters, set_seed, setup_logger
@@ -61,7 +61,7 @@ def resolve_model_config(model_name, config):
     for key in ("freq_masks", "freq_width", "time_masks", "time_width"):
         if key in masks:
             front["specaug_"+key] = masks[key]
-    effective["ce_only"] = {"input": "raw mixture v2", "teacher": False, "kd": False, "moe": False,
+    effective["ce_only"] = {"input": "FRCRN residual cache v2" if effective["dataset"].get("input_kind")=="frcrn" else "raw mixture v2", "teacher": False, "kd": False, "moe": False,
                             "stage1_epochs_applied": 0, "pretrained": effective.get("initialization",{}).get("mode")=="official_pretrained",
                             "implementation": "verified original pretrained loaders" if effective.get("initialization",{}).get("mode")=="official_pretrained" else "existing Review-3 constructors",
                             "profile": profile_key if profile else "common + user-selected previous baseline LRs",
@@ -204,8 +204,15 @@ def train_single_model(model_name, config, epochs=None, batch_size=None, device=
     logger = setup_logger(name="train_"+model_name,log_file=log_file)
     logger.info("Initialization: %s",config.get("initialization",{}).get("mode","review3_scratch"))
     kwargs = dict(root=d["data_root"], sample_rate=d["sample_rate"],duration=d["duration"],num_classes=d["num_classes"],waveform_cache=d.get("waveform_cache"))
-    train_ds=MixtureDataset(split="train",**kwargs)
-    val_ds=MixtureDataset(split="eval",**kwargs)
+    if d.get("input_kind") == "frcrn":
+        if d.get("waveform_cache") is not None:
+            raise ValueError("Raw waveform cache must not be combined with FRCRN input")
+        kwargs.pop("waveform_cache")
+        train_ds=VerifiedFRCRNDataset(split="train",cache_dir=d["frcrn_cache"],**kwargs)
+        val_ds=VerifiedFRCRNDataset(split="eval",cache_dir=d["frcrn_cache"],**kwargs)
+    else:
+        train_ds=MixtureDataset(split="train",**kwargs)
+        val_ds=MixtureDataset(split="eval",**kwargs)
     if len(train_ds)!=30240 or len(val_ds)!=3064:
         raise ValueError(f"Expected clean v2 30240/3064; got {len(train_ds)}/{len(val_ds)}")
     train_ids=[r["sample_id"] for r in train_ds.rows]
@@ -219,6 +226,8 @@ def train_single_model(model_name, config, epochs=None, batch_size=None, device=
                           "train_ids_sha256":hashlib.sha256("\n".join(train_ids).encode()).hexdigest(),
                           "eval_ids_sha256":hashlib.sha256("\n".join(val_ids).encode()).hexdigest()}
     config["dataset"]["class_names"]=train_ds.class_names
+    if d.get("input_kind") == "frcrn":
+        config["data_audit"]["frcrn_cache"] = train_ds.cache_provenance
     if smoke_test:
         train_ds=Subset(train_ds,_stratified_indices(train_ds))
         val_ds=Subset(val_ds,_stratified_indices(val_ds))

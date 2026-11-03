@@ -59,6 +59,10 @@ def cmd_prepare(args):
     assets=(PACKAGE_ROOT/"pretrained").resolve()
     assets.mkdir(exist_ok=True)
     sources=json.loads((PACKAGE_ROOT/"config/pretrained_sources.json").read_text())
+    if args.input_kind == "frcrn" and not args.skip_data:
+        from scripts.prepare_frcrn import prepare_frcrn
+        prepare_frcrn(args.data_dir, args.frcrn_cache, args.remove_archive)
+        args.skip_data = True
     if not args.skip_data:
         data=Path(args.data_dir).resolve()
         data.mkdir(parents=True,exist_ok=True)
@@ -140,7 +144,7 @@ def cmd_preflight(args):
         gc.collect()
         if args.device.startswith("cuda"):torch.cuda.empty_cache()
     from src.trainer import write_json
-    write_json(PACKAGE_ROOT/"logs/pretrained/preflight.json",receipt)
+    write_json(PACKAGE_ROOT/config["logging"].get("log_dir","logs/pretrained")/"preflight.json",receipt)
     print("Preflight finished. No optimizer step or training epoch was run.",flush=True)
 
 
@@ -225,7 +229,7 @@ def cmd_train(args: argparse.Namespace) -> None:
                        "--config", str(snapshot), "--models-config", str(registry_snapshot), "--device", str(device)]
             if args.smoke:
                 command.append("--smoke")
-            print(f"REVIEW-3 {i}/9: {name}; initialization={config.get('initialization',{}).get('mode','review3_scratch')}; raw mixture, CE-only", flush=True)
+            print(f"REVIEW-3 {i}/9: {name}; initialization={config.get('initialization',{}).get('mode','review3_scratch')}; input={config['dataset'].get('input_kind','raw mixture')}; CE-only", flush=True)
             child = subprocess.run(command, cwd=PACKAGE_ROOT)
             if child.returncode:
                 failures.append(name)
@@ -237,7 +241,7 @@ def cmd_train(args: argparse.Namespace) -> None:
                 result=json.loads((checkpoint_dir/name/"results.json").read_text(encoding="utf-8"))
                 records.append(result)
             write_json(directory/f"{suffix}_summary.json", records)
-            lines=["# Review-3 CE-only theo cấu hình nhóm", "", "Implementation and pretrained receipt are recorded per checkpoint; raw mixture v2, validation only.", "",
+            lines=["# Review-3 CE-only theo cấu hình nhóm", "", f"Input: {config['dataset'].get('input_kind','raw mixture')} v2; implementation/pretrained receipt per checkpoint; validation only.", "",
                    "| Model | Params (M) | Trainable (M) | Epochs | Best | acc | precision | recall | macro_f1 | micro_f1 | mAP | macro_acc selection |",
                    "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
             by_name={v["model_name"]:v for v in records}
@@ -426,6 +430,8 @@ def main():
     prepare.add_argument("--data-dir",default="data")
     prepare.add_argument("--skip-data",action="store_true")
     prepare.add_argument("--remove-archive",action="store_true")
+    prepare.add_argument("--input-kind",choices=("raw","frcrn"),default="raw")
+    prepare.add_argument("--frcrn-cache",default="data/frcrn")
     preflight=subparsers.add_parser("preflight",help="Verify genuine pretrained loads before using GPU time")
     preflight.add_argument("--model",default="all")
     preflight.add_argument("--config",default="config/pretrained.yaml")

@@ -15,4 +15,5 @@ logs/model_source_hashes_*
 pretrained/
 data/
 logs/pretrained/
+logs/pretrained_frcrn/
 __marimo__/
