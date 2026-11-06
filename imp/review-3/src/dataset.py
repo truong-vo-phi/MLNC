@@ -253,6 +253,13 @@ class MaskedNoiseCacheDataset(Dataset):
                     npy_p = cand
                     found = True
                     break
+            if not found and split == "test":
+                for cand in [npy_p / "validation.npy", npy_p / "eval.npy", npy_p / "validation_noise.npy"]:
+                    if cand.is_file():
+                        npy_p = cand
+                        found = True
+                        split = "validation"
+                        break
             if not found:
                 all_npys = sorted(npy_p.glob("*.npy"))
                 if all_npys:

@@ -58,7 +58,7 @@ class Trainer:
         self.grad_clip = float(train_cfg.get("grad_clip", 1.0))
         self.label_smoothing = float(train_cfg.get("label_smoothing", 0.1))
         self.patience = int(train_cfg.get("patience", 7))
-        self.metric_for_best = self.config.get("logging", {}).get("metric_for_best", "macro_f1")
+        self.metric_for_best = self.config.get("logging", {}).get("metric_for_best", "acc")
 
         # Criterion with label smoothing
         self.criterion = nn.CrossEntropyLoss(label_smoothing=self.label_smoothing)
@@ -99,6 +99,17 @@ class Trainer:
                          self.device, total_p, total_p / 1e6, train_p, train_p / 1e6)
         self.logger.info("Configuration: %s", json.dumps(self.config, indent=2, default=str))
         self.logger.info("=" * 78)
+
+    def _log_file_only(self, msg: str, *args: Any) -> None:
+        """Logs message strictly to FileHandlers so stdout/live UI stays clean."""
+        has_file_handler = False
+        for h in self.logger.handlers:
+            if isinstance(h, logging.FileHandler):
+                record = self.logger.makeRecord(self.logger.name, logging.INFO, "(file)", 0, msg, args, None)
+                h.handle(record)
+                has_file_handler = True
+        if not has_file_handler:
+            self.logger.debug(msg, *args)
 
     def train_epoch(self, epoch: int) -> tuple[float, float]:
         self.model.train()
@@ -187,10 +198,10 @@ class Trainer:
             )
             self.logger.info(msg)
 
-            # Format per-SNR breakdown
-            self.logger.info("  -> SNR Breakdown (Epoch %02d):", epoch)
+            # Format per-SNR breakdown (recorded to log file only as requested)
+            self._log_file_only("  -> SNR Breakdown (Epoch %02d):", epoch)
             for snr_tag, m in snr_breakdown.items():
-                self.logger.info(
+                self._log_file_only(
                     "     SNR %6s: Acc=%5.2f%% | Prec=%.4f | Rec=%.4f | Macro-F1=%.4f | Micro-F1=%.4f | mAP=%.4f",
                     snr_tag,
                     m["acc"] * 100,
@@ -214,7 +225,9 @@ class Trainer:
             self.history.append(record)
 
             # Checkpoint best model
-            current_metric = val_metrics.get(self.metric_for_best, val_metrics["macro_f1"])
+            if self.metric_for_best not in val_metrics:
+                raise ValueError(f"Unknown checkpoint metric: {self.metric_for_best}")
+            current_metric = val_metrics[self.metric_for_best]
             if current_metric > self.best_metric:
                 self.best_metric = current_metric
                 self.best_epoch = epoch
@@ -250,7 +263,7 @@ class Trainer:
             self.logger.info("Running final evaluation on Test Split...")
             best_ckpt = self.checkpoint_dir / "best_model.pt"
             if best_ckpt.is_file():
-                ckpt = torch.load(best_ckpt, map_location=self.device)
+                ckpt = torch.load(best_ckpt, map_location=self.device, weights_only=False)
                 self.model.load_state_dict(ckpt["model_state_dict"])
             test_loss, test_metrics, test_snr = self.evaluate(self.test_loader)
             self.logger.info("Test Loss: %.4f | Acc: %.2f%% | Macro-F1: %.4f | mAP: %.4f",

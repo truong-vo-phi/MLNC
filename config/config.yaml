@@ -1,0 +1,92 @@
+# ==============================================================================
+# Cấu hình Dual-CED-Tiny: Hệ thống Dual-Expert (~10.84M tham số)
+# Chuẩn khung sườn: imp/review-3 | Siêu tham số & Dữ liệu: imp/mix_dataset_v2
+# ==============================================================================
+
+dataset:
+  name: mixture-36l
+  data_root: datasets/mix-dataset-v2
+  frcrn_root: datasets/mix-frcrn   # FRCRN-denoised cache (train.npy / validation.npy): classifier + teacher input
+  train_manifest: train/manifest.csv
+  eval_manifest: eval/manifest.csv
+  duration: 4.0
+  sample_rate: 16000
+  num_classes: 36
+  snr_levels: [-5.0, 0.0, 5.0, 10.0, 15.0, 20.0]
+  train_samples: 30240
+  val_samples: 3064
+  test_samples: 6480
+  test_evaluated: false
+  num_workers: 4
+
+frontend:
+  sample_rate: 16000
+  n_fft: 512
+  win_length: 400
+  hop_length: 160
+  n_mels: 64
+  f_min: 20.0
+  f_max: 8000.0
+  num_frames: 398
+  log_eps: 1.0e-6
+  norm_eps: 1.0e-5
+  specaug_freq_masks: 0  # mix_dataset_v2 CE standard: False
+  specaug_time_masks: 0  # mix_dataset_v2 CE standard: False
+
+training:
+  epochs: 15
+  batch_size: 32
+  gradient_accumulation: 2
+  effective_batch_size: 64
+  backbone_lr: 3.0e-5
+  head_lr: 3.0e-4
+  router_lr: 2.0e-4
+  weight_decay: 0.01
+  warmup_epochs: 2
+  scheduler: cosine
+  min_lr: 1.0e-6
+  clip_grad_norm: 1.0
+  amp: bfloat16
+  device: auto
+  seed: 2026
+  label_smoothing: 0.0   # mix_dataset_v2 standard: 0.0 on raw logits
+  mixup: false           # mix_dataset_v2 standard: false
+  specaugment: false     # mix_dataset_v2 standard: false
+  patience: null         # Run full 15 epochs without early stopping
+
+router:
+  mode: energy_threshold # 'energy_threshold', 'soft_blending', 'oracle', hoặc 'learned'
+  threshold_db: 18.0     # < 18 dB: Low-Expert, >= 18 dB: High-Expert
+  temp_student: 1.40     # Asymmetric calibration factor
+  low_weights: [0.70, 0.30]
+  high_weights: [0.30, 0.70]
+
+logging:
+  log_dir: logs
+  checkpoint_dir: checkpoints
+  save_best: true
+  metric_for_best: acc
+  selection: max validation acc, earliest epoch on ties
+
+# Logit-only dual-teacher KD (Dual-CED-Tiny only). Teachers are frozen; only the 2 CED-Tiny experts are trained.
+kd:
+  enabled: true
+  temperature: 2.0
+  lambda_kd: 0.65          # expert_loss = (1 - lambda_kd) * CE + lambda_kd * T^2 * KL
+  label_smoothing: 0.05
+  input_rms: 0.07925       # RMS normalization of student input (teachers see the raw cache)
+  mixup:
+    enabled: true
+    alpha: 0.4
+    prob: 0.8
+  teacher_batch_size: 32
+  cache_dir: logs/teacher_cache
+  beat_config: config/beat.yaml
+  hf_repo: phitruong0606/mix-dataset-v2   # fallback when the local checkpoint is missing
+  teachers:
+    low:                                    # Low-SNR expert  <- BEATs fold0
+      path: ../../pretrained/beat-ft/beats_teacher_fold0_weights.pt
+      hf_file: beats_teacher_fold0_weights.pt
+    high:                                   # High-SNR expert <- BEATs EMA
+      path: ../../pretrained/beat-ft/beats_teacher_ema_standalone.pt
+      hf_file: beats_teacher_ema_standalone.pt

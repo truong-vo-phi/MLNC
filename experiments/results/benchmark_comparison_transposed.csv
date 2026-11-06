@@ -1,0 +1,28 @@
+,Run_1,Run_2,Run_3,Run_4
+Experiment_Name,"Dual-CED-Tiny (Original Champion, With RMS)",Dual-CED-Tiny (No RMS Ablation),"Dual-CED-Tiny (New Partitioning: Low <=10 dB, High >=15 dB)","CED-SingleMoE-SplitFFN (with_kd, review-3)"
+Architecture,Dual-Student MoE (2 independent CED-Tiny),Dual-Student MoE (2 independent CED-Tiny),Dual-Student MoE (2 independent CED-Tiny),Single CED-Tiny with Split FFN (Blocks 10-11)
+Student_Params_M,10.84,10.84,10.84,6.62
+Total_MoE_Params_M,191.52,191.52,191.52,6.62
+RMS_Norm,0.07925 (Enabled),0.0 (Bypassed),0.07925 (Enabled),0.07925 (Enabled)
+Low_Expert_SNR,All SNRs (-5..20 dB),All SNRs (-5..20 dB),"-5, 0, 5, 10 dB",Dynamic spectral routing (All SNRs)
+High_Expert_SNR,20 dB Only,20 dB Only,"15, 20 dB",Dynamic spectral routing (All SNRs)
+Router_Threshold_dB,18.0,18.0,12.5,Learned token gating
+Low_Student_Best_Macro_Acc_%,56.07,2.78,59.84,N/A (Unified)
+Low_Best_Epoch,11,1,9,N/A
+High_Student_Best_Top1_Acc_%,46.37,3.34,51.18,N/A (Unified)
+High_Best_Epoch,1,1,1,N/A
+Pipeline_Overall_Top1_Acc_%,63.94,63.97,63.94,49.8
+Pipeline_Overall_Top3_Acc_%,80.16,79.14,80.25,67.56
+Pipeline_Balanced_Acc_%,62.37,62.39,62.36,48.4
+Pipeline_Macro_Precision_%,62.64,62.35,62.72,47.48
+Pipeline_Macro_Recall_%,62.37,62.39,62.36,48.4
+Pipeline_Macro_F1_%,60.94,60.98,61.02,46.54
+Pipeline_Micro_F1_%,63.94,63.97,63.94,49.8
+Pipeline_Macro_mAP_%,69.62,69.07,69.44,53.11
+Pipeline_Macro_ROC_AUC_%,96.19,95.56,96.13,92.94
+Acc_SNR_-5dB_%,72.2,72.76,72.39,53.54
+Acc_SNR_0dB_%,72.21,71.23,72.41,54.99
+Acc_SNR_5dB_%,65.57,65.16,64.75,51.02
+Acc_SNR_10dB_%,63.55,64.72,63.35,50.1
+Acc_SNR_15dB_%,58.19,57.4,58.78,48.32
+Acc_SNR_20dB_%,51.47,52.06,51.47,40.67

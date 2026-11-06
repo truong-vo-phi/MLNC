@@ -1,0 +1,95 @@
+# Section 13 ablation matrix for CED-SingleMoE-SplitFFN.
+# Run one case at a time with the same split, seed, initialization,
+# optimizer budget, and validation-accuracy checkpoint rule.
+schema_version: 1
+defaults:
+  seed: 2026
+  epochs: 15
+  batch_size: 32
+  selection_metric: validation_top1_accuracy
+  dataset_root: /datasets/cache
+  input_format: waveform_npy_cache
+  train_array: /datasets/cache/train.npy
+  validation_array: /datasets/cache/validation.npy
+  manifest_root: /datasets/mix-dataset-v2
+  num_classes: 36
+  sample_rate: 16000
+  duration_seconds: 4
+  snr_levels: [-5, 0, 5, 10, 15, 20]
+  teacher: null
+  ced_pretrained_repo: mispeech/ced-tiny
+cases:
+  - id: ced_backbone
+    question: Does MoE improve over the shared CED backbone?
+    split_blocks: []
+    router: none
+    shared_expert: false
+    heads: single
+    router_loss_weight: 0.0
+    kd: false
+  - id: moe_block_11
+    question: Is one adaptive block sufficient?
+    split_blocks: [11]
+    router: spectral_token
+    shared_expert: true
+    heads: dual
+    router_loss_weight: 0.2
+    kd: false
+  - id: moe_blocks_10_11
+    question: Does the second adaptive block add value?
+    split_blocks: [10, 11]
+    router: spectral_token
+    shared_expert: true
+    heads: dual
+    router_loss_weight: 0.2
+    kd: false
+  - id: fixed_alpha_half
+    question: Does learned routing help over a fixed balanced gate?
+    split_blocks: [10, 11]
+    router: constant
+    alpha: 0.5
+    shared_expert: true
+    heads: dual
+    router_loss_weight: 0.0
+    kd: false
+  - id: router_cls_only
+    question: Do acoustic features add information beyond CLS?
+    split_blocks: [10, 11]
+    router: cls_only
+    shared_expert: true
+    heads: dual
+    router_loss_weight: 0.2
+    kd: false
+  - id: router_acoustic_only
+    question: Does CLS add information beyond acoustic features?
+    split_blocks: [10, 11]
+    router: acoustic_only
+    shared_expert: true
+    heads: dual
+    router_loss_weight: 0.2
+    kd: false
+  - id: router_spectral_token
+    question: Does combining acoustic and CLS features help?
+    split_blocks: [10, 11]
+    router: spectral_token
+    shared_expert: true
+    heads: dual
+    router_loss_weight: 0.2
+    kd: false
+  - id: no_shared_expert
+    question: Does the shared expert help?
+    split_blocks: [10, 11]
+    router: spectral_token
+    shared_expert: false
+    heads: dual
+    router_loss_weight: 0.2
+    kd: false
+  - id: with_kd
+    question: Does BEATs distillation help?
+    split_blocks: [10, 11]
+    router: spectral_token
+    shared_expert: true
+    heads: dual
+    router_loss_weight: 0.2
+    kd: true
+    teacher: /marimo/review-3/pretrained/beats_teacher_fold0_weights.pt

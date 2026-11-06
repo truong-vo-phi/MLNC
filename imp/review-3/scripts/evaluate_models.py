@@ -43,7 +43,7 @@ def evaluate_model(
     print(f"\n[Evaluating {model_name}] Loading checkpoint from: {checkpoint_path}")
 
     model = build_model(model_name, num_classes=num_classes).to(device)
-    ckpt = torch.load(checkpoint_path, map_location=device)
+    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     if "model_state_dict" in ckpt:
         model.load_state_dict(ckpt["model_state_dict"])
     else:

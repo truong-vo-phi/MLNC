@@ -75,7 +75,7 @@ def evaluate_single_masked_model(
     # 2. Build model
     model = build_model(model_name, num_classes=num_classes).to(device)
     if ckpt_file is not None:
-        state = torch.load(ckpt_file, map_location=device)
+        state = torch.load(ckpt_file, map_location=device, weights_only=False)
         if "model_state_dict" in state:
             model.load_state_dict(state["model_state_dict"])
         else:

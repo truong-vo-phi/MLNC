@@ -1,0 +1,137 @@
+# ==============================================================================
+# Cấu hình Dual-CED-Tiny: 2 CED experts + GREP/Alpha Post-LN + learned spectral-token router
+# Chỉ huấn luyện 2 chuyên gia CED-Tiny thông qua Logit-Only KD từ 2 BEATs Teachers
+# ==============================================================================
+
+dataset:
+  name: mixture-36l
+  data_root: datasets/mix-dataset-v2
+  frcrn_root: datasets/mix-frcrn   # FRCRN-denoised cache (train.npy / validation.npy): classifier + teacher input
+  train_manifest: train/manifest.csv
+  eval_manifest: eval/manifest.csv
+  duration: 4.0
+  sample_rate: 16000
+  num_classes: 36
+  snr_levels: [-5.0, 0.0, 5.0, 10.0, 15.0, 20.0]
+  train_samples: 30240
+  val_samples: 3064
+  test_samples: 6480
+  test_evaluated: false
+  num_workers: 4
+
+frontend:
+  sample_rate: 16000
+  n_fft: 512
+  win_length: 400
+  hop_length: 160
+  n_mels: 64
+  f_min: 20.0
+  f_max: 8000.0
+  num_frames: 398
+  log_eps: 1.0e-6
+  norm_eps: 1.0e-5
+  specaug_freq_masks: 2
+  specaug_freq_width: 8
+  specaug_time_masks: 2
+  specaug_time_width: 24
+
+architecture:
+  # BEATs-inspired student components ported from imp/moe-v2.
+  use_grep: true
+  post_ln: true
+  pre_ln: true
+
+training:
+  epochs: 15
+  batch_size: 32
+  gradient_accumulation: 2
+  effective_batch_size: 64
+  backbone_lr: 5.0e-5
+  head_lr: 1.5e-4
+  router_lr: 2.0e-4
+  weight_decay: 0.05
+  warmup_epochs: 2
+  scheduler: cosine
+  min_lr: 1.0e-6
+  clip_grad_norm: 1.0
+  amp: bfloat16
+  device: auto
+  seed: 2026
+  pretrained: true
+  pretrained_source: mispeech/ced-tiny
+  pretrained_min_tensors: 100   # CED-Tiny has 148 official backbone tensors; fail loudly below this
+  label_smoothing: 0.1
+  mixup: true
+  mixup_alpha: 0.4
+  mixup_prob: 0.8
+  specaugment: true
+  early_stopping: true
+  patience: 8            # Early stopping when val_acc does not improve for 8 consecutive epochs
+
+# Stage-2: specialize the High expert using high-SNR training clips (SNR >= 18 dB).
+# Validation and inference continue to use the learned router without SNR metadata.
+high_expert_finetune:
+  enabled: true
+  epochs: 6
+  lr: 5.0e-5
+  snr_db: 18.0
+  patience: 3
+
+kd:
+  enabled: true
+  mode: logit_only       # Only softened teacher logits (KL divergence); no feature/attention distillation
+  temperature: 2.0
+  lambda_kd: 0.65
+  fused_kd_weight: 0.65
+  specialized_kd_weight: 0.35
+  snr_transition_center_db: 15.0
+  snr_transition_tau_db: 2.5
+  label_smoothing: 0.1
+  input_rms: 0.07925
+  teacher_batch_size: 32
+  cache_dir: logs/teacher_cache
+  beat_config: config/beat.yaml
+  hf_repo: phitruong0606/mix-dataset-v2
+  mixup:
+    enabled: true
+    alpha: 0.4
+    prob: 0.8
+  specaugment:
+    enabled: true
+    freq_masks: 2
+    freq_width: 8
+    time_masks: 2
+    time_width: 24
+  teachers:
+    low:
+      path: pretrained/beat-ft/beats_teacher_fold0_weights.pt
+      hf_file: beats_teacher_fold0_weights.pt
+    high:
+      path: pretrained/beat-ft/beats_teacher_ema_standalone.pt
+      hf_file: beats_teacher_ema_standalone.pt
+
+router:
+  mode: self_contained_spectral_token
+  transition_center_db: 15.0
+  transition_tau_db: 2.5
+  token_proj_dim: 16
+  hidden_dim: 32
+  lambda_route_loss: 0.2
+  expert_ce_weight: 0.5   # Used only when KD is disabled
+
+# Inference-time multi-crop overlap (replaces the old 3-way temporal TTA ±50 ms).
+# A 4.0 s clip is evaluated with 3 crops of 3.2 s at starts 0.0 / 0.4 / 0.8 s, then logits are averaged.
+evaluation:
+  overlap:
+    enabled: true
+    num_windows: 3
+    crop_seconds: 3.2
+    aggregate: logits      # 'logits' (average raw logits) or 'probs' (average softmax probabilities)
+
+logging:
+  # Separate outputs: learned-router checkpoints are incompatible with fixed-router checkpoints.
+  log_dir: logs_moev2_router
+  checkpoint_dir: checkpoints_moev2_router
+  save_best: true
+  metric_for_best: acc
+  selection: max validation acc, earliest epoch on ties

@@ -71,4 +71,4 @@ train:
   num_workers: 0
   seed: 42
   selection_metric: macro_acc
-  amp: true
+  amp: false

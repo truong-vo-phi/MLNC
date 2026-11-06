@@ -80,5 +80,5 @@ def load_checkpoint(path: str | Path, device: torch.device) -> dict[str, Any]:
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(f"Checkpoint not found at: {path}")
-    return torch.load(str(path), map_location=device)
+    return torch.load(str(path), map_location=device, weights_only=False)
 

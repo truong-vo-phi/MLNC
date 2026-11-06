@@ -25,6 +25,7 @@ class ViTS(BaseAudioClassifier):
         n_mels: int = 128,
         num_frames: int = 398,
         dropout: float = 0.1,
+        pretrained: bool = True,
     ) -> None:
         super().__init__(
             num_classes=num_classes,
@@ -34,7 +35,7 @@ class ViTS(BaseAudioClassifier):
         )
         self.backbone = timm.create_model(
             "vit_small_patch16_224",
-            pretrained=False,
+            pretrained=pretrained,
             in_chans=1,
             img_size=(n_mels, num_frames),
             num_classes=num_classes,

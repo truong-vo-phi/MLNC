@@ -1,0 +1,20 @@
+{
+  "best_epoch": 1,
+  "best_metric": 0.078125,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 1.6799477934837341,
+      "train_acc": 0.046875,
+      "val_loss": 3.640031337738037,
+      "val_acc": 0.078125,
+      "val_precision": 0.002170138888888889,
+      "val_recall": 0.027777777777777776,
+      "val_macro_f1": 0.004025764895330113,
+      "val_micro_f1": 0.078125,
+      "val_mAP": 0.10199506572775388,
+      "elapsed": 7.465432167053223,
+      "is_best": true
+    }
+  ]
+}

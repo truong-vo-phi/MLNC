@@ -4,6 +4,7 @@ from __future__ import annotations
 import timm
 import torch
 import torch.nn.functional as F
+from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch import Tensor, nn
 
 from src.model.beat.attention import relative_position_bucket
@@ -88,9 +89,13 @@ class BiasAttention(nn.Module):
         bias = (scale * position_bias).to(q.dtype)
         
         # Tính attention bằng kernel Flash / Scaled Dot-Product tối ưu phần cứng
-        out = F.scaled_dot_product_attention(
-            q, k, v, attn_mask=bias, dropout_p=self.attn_drop.p if self.training else 0.0
-        )
+        # The fused CUDA SDPA kernels crash with illegal memory access on the
+        # Molab Blackwell runtime for this per-query additive GREP bias. The
+        # math backend computes the same attention reliably at this sequence length.
+        with sdpa_kernel(SDPBackend.MATH):
+            out = F.scaled_dot_product_attention(
+                q, k, v, attn_mask=bias, dropout_p=self.attn_drop.p if self.training else 0.0
+            )
         return self.proj_drop(self.proj(out.transpose(1, 2).reshape(B, T, C)))
 
 

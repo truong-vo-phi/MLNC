@@ -60,7 +60,7 @@ def load_teacher_model(device: torch.device, data_root: str | None = None) -> to
     for cand in candidates:
         if cand.is_file():
             try:
-                ckpt = torch.load(cand, map_location=device)
+                ckpt = torch.load(cand, map_location=device, weights_only=False)
                 if "state_dict" in ckpt:
                     # Filter keys if needed
                     sd = ckpt["state_dict"]

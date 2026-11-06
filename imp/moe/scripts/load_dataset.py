@@ -155,7 +155,14 @@ class Mixture36Dataset(LabeledAudioDataset):
         with open(self.root / "labels.txt", encoding="utf-8") as f:
             self.class_names = [line.strip() for line in f if line.strip()]
 
-        rows = read_csv(self.root / split / "manifest.csv")
+        # Molab's mix-dataset-v2 calls the validation partition "eval" while
+        # the trainer and cache use the conventional name "validation".
+        manifest_split = (
+            "eval"
+            if split == "validation" and (self.root / "eval" / "manifest.csv").is_file()
+            else split
+        )
+        rows = read_csv(self.root / manifest_split / "manifest.csv")
         if snr_db is not None:
             allowed = set(snr_db)
             rows = [row for row in rows if float(row["target_snr_db"]) in allowed]

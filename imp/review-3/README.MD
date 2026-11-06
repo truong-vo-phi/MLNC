@@ -1,5 +1,21 @@
 # Review-3: Phân Loại Âm Thanh Nhiễu Dưới Tiếng Nói Đa Mức SNR
 
+## Baseline CE theo mix_dataset_v2 (8 mô hình)
+
+Thư mục `ce_v2` chứa adapter và runner CE sao chép từ `imp/mix_dataset_v2`, loại BEATs khỏi hàng đợi. Nhánh này nạp pretrained, dùng frontend gốc từng model, mixture WAV gốc, CE không smoothing/SpecAugment, AdamW với LR riêng backbone/head, batch hiệu dụng 64, 15 epoch và chọn `best.pt` theo validation accuracy cao nhất (hòa giữ epoch trước). Đây là nhánh riêng: các lệnh `main.py train` và `scripts/run_9models_benchmark.py` vẫn dùng model/runner review-3 cũ, không tự chuyển sang adapter này.
+
+Chạy trong môi trường Python 3.12 với PyTorch/TorchAudio 2.6 CUDA 12.6 và các gói trong `ce_v2/requirements.txt`; cần GPU CUDA hỗ trợ BF16, Internet/cache pretrained và dataset mixture v2 có `train`, `eval`, `labels.txt` đúng quy cách. Chạy từ `imp/review-3/ce_v2`:
+
+```powershell
+python configure_data.py --data-root "D:/path/to/mix-dataset-v2"
+python prepare_ce9.py
+python train_ce9_clean.py
+```
+
+Chạy riêng một mô hình bằng `python train_ce9_clean.py --model ced_tiny` sau bước chuẩn bị. Tên hợp lệ: `panns_cnn10`, `ced_tiny`, `ced_mini`, `ced_small`, `efficientat_mn10`, `vit_small`, `mobilevit_s`, `mobilenet_v3_large`. Dữ liệu, cache, weights, log và checkpoint của nhánh này nằm trong `ce_v2/benchmark_results/`; không dùng checkpoint của runner cũ với adapter v2. Không tự dùng dữ liệu tổng hợp nếu thiếu dataset. Dữ liệu và pretrained không được đóng gói sẵn.
+
+Trainer benchmark cũ cũng đã chọn checkpoint theo validation `acc`; các thiết lập CE khác của nhánh v2 không tự áp dụng vào trainer cũ.
+
 Dự án tự chứa tại `imp/review-3`, thực hiện:
 - **Tác vụ 1**: Cho tập dữ liệu hỗn hợp (Mixture Audio: Tiếng nói + Nhiễu môi trường trên 6 mức SNR từ $-5\text{ dB}$ đến $20\text{ dB}$) vào **9 kiến trúc mô hình học sâu đại diện** thuộc 4 họ kiến trúc chính (CNN, Audio-Transformer, Vision-Transformer, Hybrid).
 - **Tác vụ 2**: Đánh giá 9 mô hình sau khi hỗn hợp đi qua **mặt nạ lọc FRCRN (FRCRN Masking)**, nạp trực tiếp sóng âm nhiễu ước lượng $\hat{\mathbf{n}}$ từ file `.npy` (memory-mapped cache) kèm chuẩn hóa năng lượng RMS ($\sigma_0 \approx 0.07925$), đo lường toàn diện với bộ 6 metrics (`acc`, `precision`, `recall`, `macro_f1`, `micro_f1`, `mAP`) và bảng phân rã theo từng mức SNR.

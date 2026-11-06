@@ -1,0 +1,84 @@
+# Cấu hình các mô hình đã chạy KD; dùng cùng config.yaml.
+# JSON/YAML gốc xác định implementation và checkpoint, không dùng src.models.* giả định.
+source_dir: SNR_Aware/FRCRN_KD_MoE/config/unified
+# Thứ tự ưu tiên: cấu hình chung < model < phương pháp < JSON của run.
+models:
+  hybrid_kdmoe_s:
+    source_yaml: kdmoe_s_kd.yaml
+    source_json: train_vit_kd.json
+    lr: 5.0e-4
+    weight_decay: 0.05
+    warmup_ratio: 0.05
+    kd_temperature: 2.0
+    groups: 4
+    route_by: class
+    d: 128
+    heads: 4
+    n_hybrid: 2
+    n_vit: 2
+    frontend: {n_mels: 128, num_frames: 384}
+    specaugment: {freq_masks: 2, freq_width: 16, time_masks: 2, time_width: 24}
+  panns_cnn10:
+    source_yaml: kdmoe_panns_cnn10.yaml
+    source_json: train_panns.json
+    lr: 1.0e-4
+    weight_decay: 0.05
+    warmup_ratio: 0.05
+    kd_temperature: 2.0
+    frontend: {n_mels: 64, num_frames: 400}
+    specaugment: {freq_masks: 2, freq_width: 8, time_masks: 2, time_width: 64}
+    hint_student_block: 3
+    at_student_blocks: [3, 4]
+    review_student_blocks: [1, 2, 3, 4]
+  efficientat_mn10:
+    source_yaml: kdmoe_mn10.yaml
+    source_json: train_mn10.json
+    variant: mn10_as
+    repo_commit: a425fdc
+    lr: 6.0e-5
+    weight_decay: 0.05
+    warmup_ratio: 0.05
+    kd_temperature: 2.0
+    frontend: {n_mels: 128, num_frames: 384}
+    specaugment: {freq_masks: 0, time_masks: 0}
+    hint_student_stage: 12
+    at_student_stages: [12, 16]
+    review_student_stages: [3, 6, 12, 16]
+  ced_meanpool:
+    source_yamls:
+      ced_tiny: kdmoe_ced_tiny_meanpool_kd.yaml
+      ced_mini: kdmoe_ced_mini_meanpool_kd.yaml
+      ced_small: kdmoe_ced_meanpool_kd.yaml
+    source_json_example: train_ced_tiny_meanpool_kd_t4.json
+    variants: [ced_tiny, ced_mini, ced_small]
+    repo_commit: 4b2149d
+    pooling: mean
+    lr: 1.0e-4
+    weight_decay: 0.01
+    warmup_ratio: 0.1
+    layer_decay: 0.3
+    drop_path: 0.1
+    kd_temperature: 4.0
+    frontend: {n_mels: 64, num_frames: 400}
+    specaugment: {freq_masks: 1, freq_width: 12, time_masks: 1, time_width: 80}
+    note: "Tên CED-Small trong file gốc dùng ced_meanpool, không phải ced_small_meanpool. Dùng source_json để xác định YAML chính xác."
+snr_moe_common:
+  applies_to: [panns_cnn10, efficientat_mn10, ced_meanpool]
+  num_groups: 3
+  snr_band_edges: [5.0, 15.0]
+  expert_hidden: 256
+  router_hidden: 64
+  dropout: 0.1
+  inference_mode: weighted
+  use_gate: true
+  gate_eps: 0.05
+  gate_bias_init: 2.0
+teacher:
+  name: BEATs
+  source_json: teacher.json
+  role: crossfit_teacher
+  hidden_dim: 768
+  transformer_blocks: 12
+  trainable_transformer_blocks: 12
+  frozen_during_student_training: true
+  training_config: config.yaml#kd_experiments.teacher

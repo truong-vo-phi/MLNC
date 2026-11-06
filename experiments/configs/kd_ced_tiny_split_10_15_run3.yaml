@@ -1,0 +1,70 @@
+dataset:
+  duration: 4.0
+  name: mixture-36l
+  noise_cache: /marimo/dataset/cache
+  snr_db: null
+  test_sample_ids: null
+  train_sample_ids: null
+  validation_sample_ids: null
+frontend:
+  f_max: 8000.0
+  f_min: 20.0
+  hop_length: 160
+  log_eps: 1.0e-06
+  n_fft: 512
+  n_mels: 64
+  norm_eps: 1.0e-05
+  num_frames: 398
+  sample_rate: 16000
+  win_length: 400
+loss:
+  label_smoothing: 0.1
+  temperature: 4.0
+  weight: 1.0
+specaugment:
+  freq_masks: 2
+  freq_width: 8
+  time_masks: 2
+  time_width: 24
+student:
+  arch: deit_tiny_patch16_224
+  attn_dropout: 0.0
+  bias_init: zero
+  ced_path: null
+  ced_repo: mispeech/ced-tiny
+  drop_path: 0.0
+  dropout: 0.0
+  frames: 398
+  freq_bins: 64
+  init: ced-tiny
+  num_classes: 36
+  post_ln: false
+  pre_ln: true
+teacher:
+  checkpoint: /marimo/pretrained/beats_teacher_fold0_weights.pt
+  config: config/beat.yaml
+  input_rms: 0.07925
+train:
+  amp: false
+  batch_size: 32
+  betas:
+  - 0.9
+  - 0.999
+  epochs: 15
+  eval_batch_size: 64
+  gap_penalty: 0.0
+  grad_clip: 1.0
+  lr: 0.0001
+  lr_decay: 0.5
+  lr_patience: 2
+  lr_schedule: cosine
+  min_lr: 1.0e-06
+  mixup: 0.8
+  mixup_alpha: 0.4
+  num_workers: 0
+  patience: 15
+  seed: 42
+  selection_metric: macro_acc
+  train_eval_clips: 2000
+  warmup_steps: 500
+  weight_decay: 0.1

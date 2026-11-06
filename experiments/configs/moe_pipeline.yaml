@@ -1,0 +1,59 @@
+pipeline:
+  name: champion-dual-expert
+  snr_threshold_db: 18.0
+  temp_student: 1.4
+  temp_teacher: 1.2
+  tta_shift_samples: 800
+  input_rms: 0.07925
+  low_expert:
+    student_weight: 0.3
+    teacher_fold0_weight: 0.45
+    teacher_ema_weight: 0.25
+  high_expert:
+    student_weight: 0.35
+    teacher_ema_weight: 0.4
+    teacher_fold0_weight: 0.25
+checkpoints:
+  low_student: /marimo/output/moe-from-scratch/20261105-081718-fp32-math/low/last_best_checkpoint.pt
+  high_student: /marimo/output/moe-from-scratch/20261105-081718-fp32-math/high/last_best_checkpoint.pt
+  teacher_fold0: /marimo/pretrained/beats_teacher_fold0_weights.pt
+  teacher_ema: /marimo/pretrained/beats_teacher_ema_standalone.pt
+dataset:
+  name: mixture-36l
+  duration: 4.0
+  data_root: /marimo/dataset/mix-dataset-v2
+  cache_dir: /marimo/dataset/cache
+  split: validation
+  batch_size: 64
+frontend:
+  sample_rate: 16000
+  n_fft: 512
+  win_length: 400
+  hop_length: 160
+  n_mels: 64
+  f_min: 20.0
+  f_max: 8000.0
+  num_frames: 398
+  log_eps: 1.0e-06
+  norm_eps: 1.0e-05
+specaugment:
+  freq_masks: 2
+  freq_width: 8
+  time_masks: 2
+  time_width: 24
+student:
+  arch: deit_tiny_patch16_224
+  num_classes: 36
+  freq_bins: 64
+  frames: 398
+  init: ced-tiny
+  ced_repo: mispeech/ced-tiny
+  ced_path: null
+  dropout: 0.0
+  attn_dropout: 0.0
+  drop_path: 0.0
+  post_ln: false
+  pre_ln: true
+  bias_init: zero
+teacher:
+  config: config/beat.yaml

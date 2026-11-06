@@ -90,7 +90,7 @@ class MoETrainer:
                 continue
             if "router" in name:
                 router_params.append(param)
-            elif "moe_blocks" in name or "head_low" in name or "head_high" in name:
+            elif any(key in name for key in ("ffn_shared", "ffn_low", "ffn_high", "head_low", "head_high")):
                 experts_params.append(param)
             else:
                 backbone_params.append(param)

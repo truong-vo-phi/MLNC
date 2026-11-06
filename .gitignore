@@ -16,6 +16,7 @@ notebook/__marimo__/
 
 pretrained/
 datasets/
+checkpoints/
 output/test/
 output/log/
 output/checkpoint/
@@ -27,3 +28,11 @@ output/checkpoint/
 .env
 latex/
 doc/
+*.log
+*.aux
+*.b64
+texput.*
+.tmp_deploy/
+molab_clone/
+.molab_moe_training_cells*
+scratch/*.txt

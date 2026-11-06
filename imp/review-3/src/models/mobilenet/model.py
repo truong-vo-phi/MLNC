@@ -25,6 +25,7 @@ class MobileNet(BaseAudioClassifier):
         num_frames: int = 398,
         arch: str = "mobilenetv3_large_100",
         dropout: float = 0.2,
+        pretrained: bool = True,
     ) -> None:
         super().__init__(
             num_classes=num_classes,
@@ -34,7 +35,7 @@ class MobileNet(BaseAudioClassifier):
         )
         self.backbone = timm.create_model(
             arch,
-            pretrained=False,
+            pretrained=pretrained,
             in_chans=1,
             num_classes=num_classes,
             drop_rate=dropout,

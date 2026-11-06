@@ -1,0 +1,17 @@
+# Install a matching CUDA build of these three packages first (see README).
+torch==2.6.0
+torchaudio==2.6.0
+torchvision==0.21.0
+timm==1.0.30
+einops==0.8.2
+loguru==0.7.3
+numpy>=1.26
+scipy>=1.11
+scikit-learn>=1.4
+soundfile>=0.12
+torchlibrosa>=0.1.0
+PyYAML>=6.0
+huggingface-hub>=0.19
+safetensors>=0.3
+requests>=2.31
+pytest>=7

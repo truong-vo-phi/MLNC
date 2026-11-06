@@ -61,6 +61,10 @@ class CEDSingleMoESplitFFN(BaseAudioClassifier):
         freq_bins: int | None = None,
         frames: int | None = None,
         split_blocks: tuple[int, ...] = (10, 11),
+        router_mode: str = "spectral_token",
+        use_shared_expert: bool = True,
+        single_head: bool = False,
+        constant_alpha: float = 0.5,
         dropout: float = 0.0,
         load_pretrained: bool = True,
         pretrained_path: str | None = None,
@@ -73,6 +77,12 @@ class CEDSingleMoESplitFFN(BaseAudioClassifier):
             num_frames=num_frames if frames is None else frames,
         )
         self.split_blocks = split_blocks
+        if router_mode not in {"spectral_token", "cls_only", "acoustic_only", "constant", "none"}:
+            raise ValueError(f"Unsupported router_mode: {router_mode}")
+        self.router_mode = router_mode
+        self.single_head = single_head
+        self.constant_alpha = float(constant_alpha)
+        self.pretrained_loaded_tensors = 0
         self.num_classes = num_classes
         self.freq_bins = n_mels if freq_bins is None else freq_bins
         self.frames = num_frames if frames is None else frames
@@ -137,7 +147,7 @@ class CEDSingleMoESplitFFN(BaseAudioClassifier):
         self.moe_blocks: dict[int, SplitMoEFFN] = {}
         for block_idx in self.split_blocks:
             original_mlp = self.vit.blocks[block_idx].mlp
-            moe_mlp = SplitMoEFFN(original_mlp)
+            moe_mlp = SplitMoEFFN(original_mlp, use_shared=use_shared_expert)
             self.vit.blocks[block_idx].mlp = moe_mlp
             self.moe_blocks[block_idx] = moe_mlp
 
@@ -161,25 +171,16 @@ class CEDSingleMoESplitFFN(BaseAudioClassifier):
 
         self.shared_bias.value = None
 
-        # Blocks 0 to 9
-        for i in range(10):
-            x_tok = vit.blocks[i](x_tok)
-
-        block9_token = x_tok[:, 0]
-
-        if alpha is None:
-            # If no physical spectral feature provided, route using zero placeholder or token alone
-            dummy_spec = torch.zeros(B, 6, device=x.device, dtype=x.dtype)
-            alpha, _ = self.router(dummy_spec, block9_token)
-
-        # Blocks 10 & 11 (SplitMoEFFN)
-        for i in self.split_blocks:
+        for i in range(len(vit.blocks)):
+            if i == 10:
+                block9_token = x_tok[:, 0]
+                alpha = self._route(torch.zeros(B, 6, device=x.device, dtype=x.dtype), block9_token, alpha)
             block = vit.blocks[i]
+            if i not in self.split_blocks:
+                x_tok = block(x_tok)
+                continue
             x_tok = x_tok + block.drop_path1(block.ls1(block.attn(block.norm1(x_tok))))
-            moe_mlp = block.mlp
-            normed_x = block.norm2(x_tok)
-            mlp_out = moe_mlp(normed_x, alpha)
-            x_tok = x_tok + block.drop_path2(block.ls2(mlp_out))
+            x_tok = x_tok + block.drop_path2(block.ls2(block.mlp(block.norm2(x_tok), alpha)))
 
         return vit.norm(x_tok)
 
@@ -187,7 +188,21 @@ class CEDSingleMoESplitFFN(BaseAudioClassifier):
         """Forward CLS token through fused head."""
         cls_feat = feat[:, 0]
         # Average heads when no alpha is provided
+        if self.single_head:
+            return self.vit.head(cls_feat)
         return 0.5 * self.head_low(cls_feat) + 0.5 * self.head_high(cls_feat)
+
+    def _route(self, spectral_feat: Tensor, token: Tensor, alpha: Tensor | None = None):
+        if alpha is not None:
+            return alpha
+        if self.router_mode in {"constant", "none"}:
+            return torch.full((token.shape[0], 1), self.constant_alpha, device=token.device, dtype=token.dtype)
+        if self.router_mode == "cls_only":
+            spectral_feat = torch.zeros_like(spectral_feat)
+        elif self.router_mode == "acoustic_only":
+            token = torch.zeros_like(token)
+        alpha, _ = self.router(spectral_feat, token)
+        return alpha
 
     def _load_ced_tiny_weights(self, path: str | None = None) -> None:
         """Loads offline CED-Tiny weights if available."""
@@ -217,8 +232,14 @@ class CEDSingleMoESplitFFN(BaseAudioClassifier):
                 if k.startswith((CED_PREFIX + "patch_embed.", CED_PREFIX + "norm."))
             })
             own = self.vit.state_dict()
+            for block_idx in self.split_blocks:
+                prefix = f"blocks.{block_idx}.mlp."
+                for key, value in list(mapped.items()):
+                    if key.startswith(prefix) and not key.startswith(prefix + "ffn_"):
+                        mapped[prefix + "ffn_shared." + key[len(prefix):]] = value
             mapped = {k: v for k, v in mapped.items() if k in own and own[k].shape == v.shape}
             self.vit.load_state_dict(mapped, strict=False)
+            self.pretrained_loaded_tensors = len(mapped)
 
             # Re-sync SplitMoEFFN experts with loaded base MLPs
             for block_idx in self.split_blocks:
@@ -264,32 +285,35 @@ class CEDSingleMoESplitFFN(BaseAudioClassifier):
 
         self.shared_bias.value = None
 
-        # 5. Shared Transformer blocks 0 to 9
-        for i in range(10):
-            x = vit.blocks[i](x)
-
-        block9_token = x[:, 0]  # [B, 192]
-
-        # 6. Router predicts alpha in (0, 1)
-        alpha, gates = self.router(spectral_feat, block9_token)
-
-        # 7. MoE blocks 10 & 11
-        for i in self.split_blocks:
+        # 5. Shared Transformer blocks 0-9, then route once before block 10.
+        alpha = None
+        for i in range(len(vit.blocks)):
+            if i == 10:
+                block9_token = x[:, 0]
+                alpha = self._route(spectral_feat, block9_token)
             block = vit.blocks[i]
+            if i not in self.split_blocks:
+                x = block(x)
+                continue
             x = x + block.drop_path1(block.ls1(block.attn(block.norm1(x))))
-            moe_mlp = block.mlp
-            normed_x = block.norm2(x)
-            mlp_out = moe_mlp(normed_x, alpha)
-            x = x + block.drop_path2(block.ls2(mlp_out))
+            x = x + block.drop_path2(block.ls2(block.mlp(block.norm2(x), alpha)))
+        if alpha is None:
+            block9_token = x[:, 0]
+            alpha = self._route(spectral_feat, block9_token)
+        gates = torch.cat((1.0 - alpha, alpha), dim=-1)
 
         # 8. LayerNorm and Dual Heads
         x = vit.norm(x)
         cls_final = x[:, 0]  # [B, 192]
 
-        logits_low = self.head_low(cls_final)
-        logits_high = self.head_high(cls_final)
-
-        logits_fused = (1.0 - alpha) * logits_low + alpha * logits_high
+        if self.single_head:
+            logits_low = self.vit.head(cls_final)
+            logits_high = logits_low
+            logits_fused = logits_low
+        else:
+            logits_low = self.head_low(cls_final)
+            logits_high = self.head_high(cls_final)
+            logits_fused = (1.0 - alpha) * logits_low + alpha * logits_high
 
         return {
             "logits": logits_fused,

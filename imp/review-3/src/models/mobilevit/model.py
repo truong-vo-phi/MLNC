@@ -24,6 +24,7 @@ class MobileViT(BaseAudioClassifier):
         n_mels: int = 128,
         num_frames: int = 398,
         dropout: float = 0.1,
+        pretrained: bool = True,
     ) -> None:
         super().__init__(
             num_classes=num_classes,
@@ -33,7 +34,7 @@ class MobileViT(BaseAudioClassifier):
         )
         self.backbone = timm.create_model(
             "mobilevit_s",
-            pretrained=False,
+            pretrained=pretrained,
             in_chans=1,
             num_classes=num_classes,
             drop_rate=dropout,

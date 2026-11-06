@@ -13,10 +13,12 @@ def rms_normalize(waveform, target_rms: float):
         RMS = sqrt(mean(waveform^2))
         normalized = waveform * (target_rms / RMS)
         
-    Mục đích:
-        Đưa tất cả các đoạn âm thanh về cùng một mức năng lượng/âm lượng chuẩn (target_rms = 0.07925),
-        giúp mô hình nơ-ron không bị ảnh hưởng bởi độ to nhỏ bất thường của thiết bị ghi âm.
+    Ghi chú quan trọng:
+        Nếu target_rms <= 0 (chế độ bỏ chuẩn hóa - ablation không RMS), hàm sẽ trả về
+        dạng sóng thô nguyên bản (raw waveform), KHÔNG nhân với 0.
     """
+    if target_rms <= 0.0:
+        return waveform
     rms = waveform.square().mean(dim=-1, keepdim=True).sqrt().clamp_min(1e-8)
     return waveform * (target_rms / rms)
 

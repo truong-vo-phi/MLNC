@@ -6,3 +6,5 @@ checkpoints/
 *.npy
 logs/*.log
 .pytest_cache/
+ce_v2/benchmark_results/
+

@@ -25,8 +25,9 @@ class SplitMoEFFN(nn.Module):
     """
     Split-FFN containing 1 Shared Expert + 2 Routed Experts (Low-SNR & High-SNR).
     """
-    def __init__(self, base_mlp: nn.Module) -> None:
+    def __init__(self, base_mlp: nn.Module, use_shared: bool = True) -> None:
         super().__init__()
+        self.use_shared = use_shared
         self.ffn_shared = copy.deepcopy(base_mlp)
         self.ffn_low = copy.deepcopy(base_mlp)
         self.ffn_high = copy.deepcopy(base_mlp)
@@ -48,5 +49,7 @@ class SplitMoEFFN(nn.Module):
 
         # Normalized convex combination
         routed_out = (1.0 - alpha) * out_low + alpha * out_high
-        return 0.5 * out_shared + 0.5 * routed_out
+        if self.use_shared:
+            return 0.5 * out_shared + 0.5 * routed_out
+        return routed_out
 

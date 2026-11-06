@@ -109,6 +109,7 @@ def cmd_train(args: argparse.Namespace) -> None:
 
     from scripts.run_all_models import train_single_model
 
+    noise_cache = getattr(args, "noise_cache", None) or config.get("noise_cache", {}).get("cache_dir")
     results = []
     for model_name in target_models:
         print(f"\n[>>>] Starting training pipeline for: {model_name}...")
@@ -118,6 +119,7 @@ def cmd_train(args: argparse.Namespace) -> None:
                 config=config,
                 device=device,
                 smoke_test=args.smoke,
+                noise_cache_path=noise_cache,
             )
             results.append(res)
             print(f"[OK] Finished {model_name}: Best Metric = {res['best_metric']:.4f}")
@@ -252,22 +254,15 @@ def cmd_eval_masked(args: argparse.Namespace) -> None:
     print(f"     Chi tiet log: {log_file}")
 
 
-def cmd_kd(args: argparse.Namespace) -> None:
-    """Task 3: BEATs -> CED-Tiny Knowledge Distillation Benchmark."""
-    from scripts.run_kd_benchmark import run_kd_benchmark
-    run_kd_benchmark(args)
-
-
-def cmd_moe(args: argparse.Namespace) -> None:
-    """Task 4: Proposed Single-Backbone MoE (CED-SingleMoE-SplitFFN ~6.62M params) Benchmark."""
-    from scripts.run_task4_moe import run_task4_benchmark
-    run_task4_benchmark(
-        epochs=args.epochs or 15,
-        batch_size=args.batch_size or 32,
-        smoke=args.smoke,
-        no_kd=args.no_kd,
-        device_name=None if args.device == "auto" else args.device,
-    )
+def cmd_eval_9models(args: argparse.Namespace) -> None:
+    """Benchmark evaluation of 9 canonical models under No FRCRN and Mix + FRCRN."""
+    import subprocess
+    script = PACKAGE_ROOT / "scripts" / "evaluate_9models_benchmark.py"
+    cmd = [sys.executable, str(script), "--config", args.config, "--data-root", args.data_root or "/datasets/mix-frcrn",
+           "--device", args.device]
+    if args.max_samples:
+        cmd.extend(["--max-samples", str(args.max_samples)])
+    subprocess.run(cmd, check=True)
 
 
 def cmd_kd(args: argparse.Namespace) -> None:
@@ -308,6 +303,7 @@ def main():
     parser_train.add_argument("--batch-size", type=int, default=None, help="Batch size")
     parser_train.add_argument("--lr", type=float, default=None, help="Learning rate")
     parser_train.add_argument("--data-root", type=str, default=None, help="Root path of mixture dataset")
+    parser_train.add_argument("--noise-cache", type=str, default=None, help="Path to FRCRN-masked .npy cache or directory")
     parser_train.add_argument("--smoke", action="store_true", help="Quick 1-epoch smoke test run")
     parser_train.add_argument("--device", type=str, default="auto", help="Compute device ('cuda', 'cpu', 'auto')")
     parser_train.add_argument("--config", type=str, default="config/config.yaml", help="Path to config.yaml")
@@ -339,26 +335,12 @@ def main():
     parser_eval_masked.add_argument("--data-root", type=str, default=None, help="Root path of mixture dataset for manifest")
     parser_eval_masked.add_argument("--config", type=str, default="config/config.yaml", help="Path to config.yaml")
 
-    # kd (Task 3: BEATs -> CED-Tiny Knowledge Distillation)
-    parser_kd = subparsers.add_parser("kd", help="Task 3: BEATs -> CED-Tiny KD (5 methods + BeatBiasPostLN comparison)")
-    parser_kd.add_argument("--method", type=str, default="all",
-                           choices=["all", "logit", "crd", "mgd", "logit+crd", "logit+mgd"],
-                           help="Specific KD method or 'all' to run complete benchmark")
-    parser_kd.add_argument("--epochs", type=int, default=None, help="Number of training epochs")
-    parser_kd.add_argument("--batch-size", type=int, default=None, help="Batch size")
-    parser_kd.add_argument("--smoke", action="store_true", help="Quick 1-epoch smoke test")
-    parser_kd.add_argument("--noise-cache", type=str, default=None, help="Path to FRCRN-masked .npy cache or directory")
-    parser_kd.add_argument("--data-root", type=str, default=None, help="Root path of mixture dataset")
-    parser_kd.add_argument("--device", type=str, default="auto", help="Compute device ('cuda', 'cpu', 'auto')")
-    parser_kd.add_argument("--config", type=str, default="config/config.yaml", help="Path to config.yaml")
-
-    # moe (Task 4: Proposed CED-SingleMoE-SplitFFN ~6.62M params Benchmark)
-    parser_moe = subparsers.add_parser("moe", help="Task 4: Benchmark proposed CED-SingleMoE-SplitFFN (~6.62M params)")
-    parser_moe.add_argument("--epochs", type=int, default=15, help="Number of training epochs")
-    parser_moe.add_argument("--batch-size", type=int, default=32, help="Batch size")
-    parser_moe.add_argument("--smoke", action="store_true", help="Quick 1-epoch smoke test")
-    parser_moe.add_argument("--no-kd", action="store_true", help="Disable BEATs Knowledge Distillation")
-    parser_moe.add_argument("--device", type=str, default="auto", help="Compute device ('cuda', 'cpu', 'auto')")
+    # eval-9models (No FRCRN vs Mix + FRCRN)
+    parser_eval_9 = subparsers.add_parser("eval-9models", help="Benchmark 9 models: No FRCRN vs Mix + FRCRN")
+    parser_eval_9.add_argument("--data-root", type=str, default="/datasets/mix-frcrn", help="Dataset root path")
+    parser_eval_9.add_argument("--max-samples", type=int, default=None, help="Maximum samples for quick check")
+    parser_eval_9.add_argument("--device", type=str, default="auto", help="Compute device ('cuda', 'cpu', 'auto')")
+    parser_eval_9.add_argument("--config", type=str, default="config/config.yaml", help="Path to config.yaml")
 
     # kd (Task 3: BEATs -> CED-Tiny Knowledge Distillation)
     parser_kd = subparsers.add_parser("kd", help="Task 3: BEATs -> CED-Tiny KD (5 methods + BeatBiasPostLN comparison)")
@@ -393,6 +375,8 @@ def main():
         cmd_eval(args)
     elif args.command == "eval-masked":
         cmd_eval_masked(args)
+    elif args.command == "eval-9models":
+        cmd_eval_9models(args)
     elif args.command == "kd":
         cmd_kd(args)
     elif args.command == "moe":

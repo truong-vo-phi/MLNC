@@ -48,10 +48,11 @@ def build_model(
     sample_rate: int = 16000,
     n_mels: int = 128,
     num_frames: int = 398,
+    pretrained: bool = True,
     **kwargs: Any,
 ) -> BaseAudioClassifier:
     """
-    Builds a model by key name.
+    Builds a model by key name. Supports pretrained initialization.
     """
     key = model_name.lower().replace("-", "_").replace(" ", "_")
     # Aliases
@@ -83,6 +84,11 @@ def build_model(
         n_mels = 64
 
     model_cls = MODEL_REGISTRY[key]
+    import inspect
+    sig = inspect.signature(model_cls.__init__)
+    if "pretrained" in sig.parameters:
+        kwargs["pretrained"] = pretrained
+
     return model_cls(
         num_classes=num_classes,
         sample_rate=sample_rate,

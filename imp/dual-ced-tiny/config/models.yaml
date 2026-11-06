@@ -1,0 +1,66 @@
+# ==============================================================================
+# Danh mục đặc tả Dual-CED-Tiny với GREP, Alpha Post-LN và learned router (~10.80M)
+# ==============================================================================
+
+models:
+  dual_ced_tiny:
+    display_name: "Dual-CED-Tiny"
+    family: "Audio-Transformer MoE"
+    total_params_m: 10.80
+    backbones: 2
+    embed_dim: 192
+    num_heads: 3
+    num_layers_per_backbone: 12
+    description: "Hai expert CED-Tiny có GREP + Alpha Post-LN, cổng học từ acoustic features và CLS token."
+    architecture: {grep: true, post_ln: true, pre_ln: true, deepnorm_alpha: "(2 * depth)^0.25"}
+    router:
+      type: "SelfContainedSpectralTokenRouter"
+      transition_center_db: 15.0
+      transition_tau_db: 2.5
+      token_proj_dim: 16
+      hidden_dim: 32
+      lambda_route_loss: 0.2
+      routing_policy: "Soft blending; SNR chỉ dùng làm soft target trong train"
+    training:
+      epochs: 15
+      batch_size: 32
+      gradient_accumulation: 2
+      effective_batch_size: 64
+      backbone_lr: 5.0e-5
+      head_lr: 1.5e-4
+      router_lr: 2.0e-4
+      weight_decay: 0.05
+
+  ced_tiny_low:
+    display_name: "CED-Tiny Low-Expert"
+    family: "Audio-Transformer"
+    total_params_m: 5.41
+    embed_dim: 192
+    num_heads: 3
+    num_layers: 12
+    description: "Nhánh chuyên gia CED-Tiny tối ưu cho môi trường nhiễu mạnh (SNR < 18 dB, dải -5 dB đến 15 dB)."
+    training:
+      epochs: 30
+      batch_size: 32
+      gradient_accumulation: 2
+      effective_batch_size: 64
+      backbone_lr: 1.0e-4
+      head_lr: 1.0e-4
+      weight_decay: 0.01
+
+  ced_tiny_high:
+    display_name: "CED-Tiny High-Expert"
+    family: "Audio-Transformer"
+    total_params_m: 5.41
+    embed_dim: 192
+    num_heads: 3
+    num_layers: 12
+    description: "Nhánh chuyên gia CED-Tiny tối ưu cho môi trường âm thanh rõ (SNR >= 18 dB, mốc 20 dB)."
+    training:
+      epochs: 30
+      batch_size: 32
+      gradient_accumulation: 2
+      effective_batch_size: 64
+      backbone_lr: 1.0e-4
+      head_lr: 1.0e-4
+      weight_decay: 0.01

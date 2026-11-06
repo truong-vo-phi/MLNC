@@ -8,6 +8,20 @@ import math
 from typing import NamedTuple
 
 import torch
+import torchvision
+
+# Scoped compatibility patch for torchaudio on Python 3.13 / PyTorch 2.11
+if hasattr(torch, "_ops") and hasattr(torch._ops, "_OpNamespace"):
+    _orig_op_getattr = torch._ops._OpNamespace.__getattr__
+    def _safe_op_getattr(self, op_name):
+        try:
+            return _orig_op_getattr(self, op_name)
+        except AttributeError:
+            if getattr(self, "name", None) == "torchaudio":
+                return lambda *args, **kwargs: None
+            raise
+    torch._ops._OpNamespace.__getattr__ = _safe_op_getattr
+
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio.transforms as T

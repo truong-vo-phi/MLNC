@@ -1,0 +1,6 @@
+Model_Configuration,Params_M,Top1_Acc_%,Top3_Acc_%,Bal_Acc_%,Macro_F1_%,Macro_mAP_%,Macro_ROC_AUC_%,Acc_SNR_-5dB_%,Acc_SNR_0dB_%,Acc_SNR_5dB_%,Acc_SNR_10dB_%,Acc_SNR_15dB_%,Acc_SNR_20dB_%
+Dual-CED Run 1 (tau=18dB),10.84,59.04,77.51,57.05,55.55,64.81,95.67,66.79,65.56,59.43,58.87,55.03,48.13
+Dual-CED Run 3 (tau=12.5dB),10.84,58.98,77.81,57.14,55.75,63.94,95.35,66.98,64.77,59.63,58.09,55.82,48.13
+Single Low-Expert Alone,5.42,58.55,77.42,56.83,55.22,64.43,95.48,66.98,64.77,59.63,58.09,55.03,46.37
+Monolithic CED-Small Baseline,21.43,57.80,75.82,56.51,55.36,60.53,N/A,N/A,N/A,N/A,N/A,N/A,N/A
+Monolithic CED-Tiny Baseline,5.41,53.88,71.95,52.13,50.97,56.53,N/A,N/A,N/A,N/A,N/A,N/A,N/A

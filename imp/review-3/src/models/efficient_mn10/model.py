@@ -25,6 +25,7 @@ class EfficientMN10(BaseAudioClassifier):
         n_mels: int = 128,
         num_frames: int = 398,
         dropout: float = 0.2,
+        pretrained: bool = True,
     ) -> None:
         super().__init__(
             num_classes=num_classes,
@@ -34,7 +35,7 @@ class EfficientMN10(BaseAudioClassifier):
         )
         self.backbone = timm.create_model(
             "mobilenetv3_large_100",
-            pretrained=False,
+            pretrained=pretrained,
             in_chans=1,
             num_classes=num_classes,
             drop_rate=dropout,
